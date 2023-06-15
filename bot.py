@@ -33,7 +33,7 @@ dp = Dispatcher(bot, storage=storage)
 
 # -------- GLOBAL ----------
 # TODO брать из outdir_txt2img_samples
-img_dir = "C:/html/stable-diffusion-webui/outputs/txt2img-images/"
+img_dir = "../../outputs/txt2img-images/"
 formatted_date = datetime.today().strftime("%Y-%m-%d")
 host = "127.0.0.1"
 port = "7861"
@@ -62,7 +62,7 @@ data = {
     "firstphase_width": 0,
     "firstphase_height": 0,
     "save_images": "true",
-    "use_async": "True",
+    #"use_async": "True",
 }
 
 dataParams = {"img_thumb": "true", "img_tg": "true", "img_real": "true"}

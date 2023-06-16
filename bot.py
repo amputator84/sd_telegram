@@ -30,7 +30,8 @@ from translate import Translator
 API_TOKEN = "900510503:AAG5Xug_JEERhKlf7dpOpzxXcJIzlTbWX1M"
 
 bot = Bot(token=API_TOKEN)
-dp = Dispatcher(bot)
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
 # Получаем список аргументов функции api.txt2img и возвращаем JSON {"/prompt": "","/seed": "-1",...}
 def getAttrtxt2img():
@@ -205,19 +206,8 @@ def getStart(returnAll=1) -> InlineKeyboardMarkup:
         InlineKeyboardButton("opt",      callback_data="opt"),
         InlineKeyboardButton("gen",      callback_data="gen"),
         InlineKeyboardButton("skip",     callback_data="skip"),
-        InlineKeyboardButton("progress", callback_data="progress"),
+        InlineKeyboardButton("status",   callback_data="status"),
         InlineKeyboardButton("help",     callback_data="help"),
-    ]
-    return (getKeyboard(keysArr, returnAll))
-
-# Меню генераций
-def getGen(returnAll=1) -> InlineKeyboardMarkup:
-    keysArr = [
-        InlineKeyboardButton("gen1",    callback_data="gen1"),
-        InlineKeyboardButton("gen4",    callback_data="gen4"),
-        InlineKeyboardButton("gen10",   callback_data="gen10"),
-        InlineKeyboardButton("gen_hr",  callback_data="gen_hr"),
-        InlineKeyboardButton("gen_hr4", callback_data="gen_hr4"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -252,17 +242,6 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [InlineKeyboardButton("random_prompt", callback_data="random_prompt")]
     return (getKeyboard(keysArr, returnAll))
 
-# Меню генераций
-def getGen(returnAll=1) -> InlineKeyboardMarkup:
-    keysArr = [
-        InlineKeyboardButton("gen1", callback_data="gen1"),
-        InlineKeyboardButton("gen4", callback_data="gen4"),
-        InlineKeyboardButton("gen10", callback_data="gen10"),
-        InlineKeyboardButton("gen_hr", callback_data="gen_hr"),
-        InlineKeyboardButton("gen_hr4", callback_data="gen_hr4"),
-    ]
-    return (getKeyboard(keysArr, returnAll))
-
 # Меню текста
 def getTxt():
     return "/start /opt /gen /skip /status /help"
@@ -292,10 +271,7 @@ def ping(status: str):
 async def cmd_start(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("cmd_start")
     txt = "Это бот для локального запуска SD\n" + getTxt()
-    if hasattr(message, "content_type"):
-        await message.reply(txt, reply_markup=getStart())
-    else:
-        await message.message.edit_text(txt, reply_markup=getStart())
+    await getKeyboardUnion(txt, message, getStart())
 
 # Запуск/Остановка SD. Завязываемся на глобальную иконку sd
 @dp.callback_query_handler(text="sd")
@@ -328,68 +304,67 @@ async def inl_sd(callback: types.CallbackQuery) -> None:
             "SD запущена\n" + getTxt(), reply_markup=getStart()
         )
 
-# Вызов меню генераций getGen
+# Вызов reset_param, сброс JSON
+@dp.message_handler(commands=["reset_param"])
+@dp.callback_query_handler(text="reset_param")
+async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_reset_param")
+    global data
+    global dataParams
+    data = dataOld
+    dataParams = dataOldParams
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
+    await getKeyboardUnion(txt, message, keyboard)
+
+# Обработчик команды /status
+@dp.message_handler(commands=["status"])
+@dp.callback_query_handler(text="status")
+async def inl_status(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print(inl_status)
+    print(api.get_progress()["eta_relative"])
+
+
+#---
+async def run_txt2img():
+    res = await asyncio.to_thread(api.txt2img, **data)
+    return res
+
 @dp.message_handler(commands=["gen"])
 @dp.callback_query_handler(text="gen")
 async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_gen")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getGen(0), getStart(0)])
-    # Если команда /gen
     if hasattr(message, "content_type"):
-        await bot.send_message(
-            chat_id=message.from_user.id, text="Виды генераций", reply_markup=keyboard
-        )
+        chatId = message.chat.id
     else:
-        await bot.edit_message_text(
-            chat_id=message.message.chat.id,
-            message_id=message.message.message_id,
-            text="Виды генераций",
-            reply_markup=keyboard,
-        )
-
-# Генерация изображений
-# TODO gen4/gen10
-@dp.callback_query_handler(text="gen1")
-@dp.callback_query_handler(text="gen4")
-@dp.callback_query_handler(text="gen10")
-@dp.callback_query_handler(text="gen_hr")
-@dp.callback_query_handler(text="gen_hr4")
-async def inl_gen1(callback: types.CallbackQuery) -> None:
-    print("inl_gen1")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getGen(0), getStart(0)])
-    if callback.data == "gen1":
-        data["batch_size"] = 1
-    if callback.data == "gen4" or callback.data == "gen_hr4":
-        data["batch_size"] = 4
-    if callback.data == "gen10":
-        data["batch_size"] = 10
-    if callback.data == "gen_hr" or callback.data == "gen_hr4":
-        data["enable_hr"] = "true"
-        data["hr_resize_x"] = data["width"] * 2
-        data["hr_resize_y"] = data["height"] * 2
-    #data['prompt'] = 'толстый кот в машине'
-    #data['prompt'] = translateRuToEng(data['prompt'])
-    print(data)
-    res = api.txt2img(**data)
-    if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-        await bot.send_media_group(
-            chat_id=callback.message.chat.id, media=pilToImages(res, "thumbs")
-        )
-    if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-        await bot.send_media_group(
-            chat_id=callback.message.chat.id, media=pilToImages(res, "tg")
-        )
-    if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-        await bot.send_media_group(
-            chat_id=callback.message.chat.id, media=pilToImages(res, "real")
-        )
-    print(data["prompt"])
-    await bot.send_message(
-        chat_id=callback.message.chat.id,
-        text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
-        reply_markup=keyboard,
+        chatId = message.message.chat.id
+    task = asyncio.create_task(run_txt2img())
+    start_time = time.time()
+    message = await bot.send_message(
+        chat_id=chatId,
+        text=data["prompt"] + "\n" + "Processing...",
+        reply_markup=getStart(),
         parse_mode="Markdown",
     )
+    while not task.done():
+        processing_time = round(time.time() - start_time, 2) + api.get_progress()
+        await bot.edit_message_text(
+            chat_id=chatId,
+            message_id=message.message_id,
+            text=data["prompt"] + "\n" + f"Processing time: {processing_time} seconds",
+            reply_markup=getStart(),
+            parse_mode="Markdown",
+        )
+        await asyncio.sleep(1)
+    res = await task
+    processing_time = round(time.time() - start_time, 2) + api.get_progress()
+    await bot.edit_message_text(
+        chat_id=chatId,
+        message_id=message.message_id,
+        text=data["prompt"] + "\n" + str(res.info["all_seeds"]) + "\n\n" + f"Processing time: {processing_time} seconds",
+        reply_markup=getStart(),
+        parse_mode="Markdown",
+    )
+
 
 @dp.callback_query_handler(text="random_prompt")
 async def random_prompt(callback: types.CallbackQuery) -> None:
@@ -454,21 +429,7 @@ async def getLora(message: Union[types.Message, types.CallbackQuery]) -> None:
     for file_name in lora_files:
         name = file_name.replace(".safetensors", "")
         arr = arr + f"`<lora:{name}:1>`\n\n"
-    if hasattr(message, "content_type"):
-        await bot.send_message(
-            chat_id=message.from_user.id,
-            text=arr,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
-    else:
-        await bot.edit_message_text(
-            chat_id=message.message.chat.id,
-            message_id=message.message.message_id,
-            text="Список LORA\n" + arr,
-            reply_markup=keyboard,
-            parse_mode="Markdown",
-        )
+    await getKeyboardUnion(arr, message, keyboard)
 
 @dp.message_handler(commands=["test"])
 async def cmd_test(message: Union[types.Message, types.CallbackQuery]) -> None:

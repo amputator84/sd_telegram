@@ -190,7 +190,10 @@ async def getKeyboardUnion(txt, message, keyboard):
     # Если команда /settings
     if hasattr(message, "content_type"):
         await bot.send_message(
-            chat_id=message.from_user.id, text=txt, reply_markup=keyboard
+            chat_id=message.from_user.id,
+            text=txt,
+            reply_markup=keyboard,
+            parse_mode="Markdown"
         )
     else:
         await bot.edit_message_text(
@@ -198,6 +201,7 @@ async def getKeyboardUnion(txt, message, keyboard):
             message_id=message.message.message_id,
             text=txt,
             reply_markup=keyboard,
+            parse_mode="Markdown"
         )
 
 def getStart(returnAll=1) -> InlineKeyboardMarkup:
@@ -313,7 +317,7 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
     global dataParams
     data = dataOld
     dataParams = dataOldParams
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard)
 
@@ -365,10 +369,13 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         parse_mode="Markdown",
     )
 
-
-@dp.callback_query_handler(text="random_prompt")
-async def random_prompt(callback: types.CallbackQuery) -> None:
-    await bot.send_message(chat_id=callback.from_user.id, text=get_random_prompt())
+# Получить меню действий с промптами
+@dp.message_handler(commands=["prompt"])
+@dp.callback_query_handler(text="prompt")
+async def cmd_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("cmd_prompt")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
+    await getKeyboardUnion("Опции", message, keyboard)
 
 # Получить опции
 @dp.message_handler(commands=["opt"])
@@ -383,7 +390,7 @@ async def cmd_opt(message: Union[types.Message, types.CallbackQuery]) -> None:
 @dp.callback_query_handler(text="settings")
 async def inl_settings(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("inl_settings")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Настройки", message, keyboard)
 
 # Вызов script
@@ -391,14 +398,14 @@ async def inl_settings(message: Union[types.Message, types.CallbackQuery]) -> No
 @dp.callback_query_handler(text="scripts")
 async def inl_scripts(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("inl_scripts")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Скрипты", message, keyboard)
 
 # Вызов change_param
 @dp.callback_query_handler(text="change_param")
 async def inl_change_param(callback: types.CallbackQuery) -> None:
     print("inl_change_param")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     json_list = [f"/{key} = {value}" for key, value in data.items()]
     json_list_params = [f"/{key} = {value}" for key, value in dataParams.items()]
     json_str = "\n".join(json_list)
@@ -412,7 +419,7 @@ async def inl_change_param(callback: types.CallbackQuery) -> None:
 @dp.callback_query_handler(text="get_lora")
 async def getLora(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("getLora")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getOpt(0), getStart(0)])
     # Путь к папке "Lora"
     path = "../../models/Lora"
 
@@ -430,6 +437,11 @@ async def getLora(message: Union[types.Message, types.CallbackQuery]) -> None:
         name = file_name.replace(".safetensors", "")
         arr = arr + f"`<lora:{name}:1>`\n\n"
     await getKeyboardUnion(arr, message, keyboard)
+
+@dp.callback_query_handler(text="random_prompt")
+async def random_prompt(callback: types.CallbackQuery) -> None:
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
+    await bot.send_message(chat_id=callback.from_user.id, text=get_random_prompt(), reply_markup=keyboard)
 
 @dp.message_handler(commands=["test"])
 async def cmd_test(message: Union[types.Message, types.CallbackQuery]) -> None:

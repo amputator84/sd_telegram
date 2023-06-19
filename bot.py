@@ -328,11 +328,16 @@ async def inl_status(message: Union[types.Message, types.CallbackQuery]) -> None
     print(inl_status)
     print(api.get_progress()["eta_relative"])
 
-
-#---
-async def run_txt2img():
-    res = await asyncio.to_thread(api.txt2img, **data)
-    return res
+# Вывод прогресса в заменяемое сообщение
+async def getProgress(msgTime):
+    while True:
+        # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
+        await asyncio.sleep(2)
+        await bot.edit_message_text(
+            chat_id=msgTime.chat.id,
+            message_id=msgTime.message_id,
+            text=str(round(api.get_progress()['progress']*100))+'%'
+        )
 
 @dp.message_handler(commands=["gen"])
 @dp.callback_query_handler(text="gen")
@@ -341,33 +346,35 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         chatId = message.chat.id
     else:
         chatId = message.message.chat.id
-    task = asyncio.create_task(run_txt2img())
-    start_time = time.time()
-    message = await bot.send_message(
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
+    msgTime = await bot.send_message(
         chat_id=chatId,
-        text=data["prompt"] + "\n" + "Processing...",
-        reply_markup=getStart(),
-        parse_mode="Markdown",
+        text='Начали'
     )
-    while not task.done():
-        processing_time = round(time.time() - start_time, 2) + api.get_progress()
-        await bot.edit_message_text(
-            chat_id=chatId,
-            message_id=message.message_id,
-            text=data["prompt"] + "\n" + f"Processing time: {processing_time} seconds",
-            reply_markup=getStart(),
-            parse_mode="Markdown",
+    # Включаем асинхрон, чтоб заработал await api.txt2img
+    data["use_async"] = "True"
+    asyncio.create_task(getProgress(msgTime))
+    res = await api.txt2img(**data)
+    if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+        await bot.send_media_group(
+            chat_id=chatId, media=pilToImages(res, "thumbs")
         )
-        await asyncio.sleep(1)
-    res = await task
-    processing_time = round(time.time() - start_time, 2) + api.get_progress()
-    await bot.edit_message_text(
+    if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+        await bot.send_media_group(
+            chat_id=chatId, media=pilToImages(res, "tg")
+        )
+    if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+        await bot.send_media_group(
+            chat_id=chatId, media=pilToImages(res, "real")
+        )
+    await bot.send_message(
         chat_id=chatId,
-        message_id=message.message_id,
-        text=data["prompt"] + "\n" + str(res.info["all_seeds"]) + "\n\n" + f"Processing time: {processing_time} seconds",
-        reply_markup=getStart(),
+        text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
+        reply_markup=keyboard,
         parse_mode="Markdown",
     )
+    # Удаляем сообщение с прогрессом
+    await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
 
 # Получить меню действий с промптами
 @dp.message_handler(commands=["prompt"])
@@ -466,10 +473,10 @@ async def cmd_test(message: Union[types.Message, types.CallbackQuery]) -> None:
     print(translation)
 
 @dp.message_handler(commands=["start2"])
-async def cmd_start(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("cmd_start")
+async def cmd_start2(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("cmd_start2")
     subprocess.Popen(
-        ["python", "../../launch.py", "--nowebui", "--xformers"]
+        ["python", "../../launch.py", "--nowebui"] # , "--xformers"
     )
 
 @dp.message_handler(commands=["test2"])

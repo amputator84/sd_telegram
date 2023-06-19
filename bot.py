@@ -77,23 +77,16 @@ Form = type("Form", (StatesGroup,), state_classes)
 # -------- FUNCTIONS ----------
 # Запуск SD через subprocess и запись в глобальную переменную process
 def start_sd():
-    global process
+    global process, sd
     if not process:
-        print("start_process sd")
-        try:
-            # ../../ launch.py = смотрим из stable-diffusion-webui/extensions/sd_telegram в корень папки stable-diffusion-webui
-            process = subprocess.Popen(
-                ["python", "../../launch.py", "--nowebui", "--xformers"]
-            )
-            # TODO stderr, stdout выводить в сообщение телеграм
-        except subprocess.CalledProcessError as e:
-            print("e:", e)
+        print('start_process start_sd')
+        process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers"])
+        sd = "✅"
 
-# Остановка SD
 def stop_sd():
     global process, sd
     if process:
-        print("stop_process sd")
+        print('stop_process stop_sd')
         process.terminate()
         process = None
         sd = "❌"
@@ -206,7 +199,7 @@ async def getKeyboardUnion(txt, message, keyboard):
 
 def getStart(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
-        InlineKeyboardButton("sd" + sd,  callback_data="sd"),
+        InlineKeyboardButton(sd + "sd",  callback_data="sd"),
         InlineKeyboardButton("opt",      callback_data="opt"),
         InlineKeyboardButton("gen",      callback_data="gen"),
         InlineKeyboardButton("skip",     callback_data="skip"),
@@ -250,22 +243,6 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
 def getTxt():
     return "/start /opt /gen /skip /status /help"
 
-# Проверка связи до запущенной локальной SD с nowebui
-def ping(status: str):
-    url = local + "/docs"
-    while True:
-        try:
-            r = requests.get(url, timeout=3)
-            r.raise_for_status()
-            code = r.status_code
-            print(code)
-            if (status == "stop" and code != 200) or (status == "start" and code == 200):
-                return True
-        except requests.exceptions.RequestException as err:
-            print("Error:", err)
-        time.sleep(3)
-
-
 # -------- COMMANDS ----------
 
 # start или help
@@ -277,19 +254,19 @@ async def cmd_start(message: Union[types.Message, types.CallbackQuery]) -> None:
     txt = "Это бот для локального запуска SD\n" + getTxt()
     await getKeyboardUnion(txt, message, getStart())
 
+# TODO optimize
 # Запуск/Остановка SD. Завязываемся на глобальную иконку sd
 @dp.callback_query_handler(text="sd")
 async def inl_sd(callback: types.CallbackQuery) -> None:
     print("inl_sd")
     global sd
-    if sd == "✅":
+    if sd == '✅':
         stop_sd()
         sd = "⌛"
         await callback.message.edit_text(
             "Останавливаем SD\n" + getTxt(), reply_markup=getStart()
         )
-        ping("stop")
-        sd = "❌"
+        sd = '❌'
         await callback.message.edit_text(
             "SD остановлена\n" + getTxt(), reply_markup=getStart()
         )
@@ -299,10 +276,23 @@ async def inl_sd(callback: types.CallbackQuery) -> None:
         await callback.message.edit_text(
             "Запускаем SD\n" + getTxt(), reply_markup=getStart()
         )
-        #options = {}
-        #options['outdir_txt2img_samples'] = '../../outputs/txt2img-images'
-        #api.set_options(options)
-        ping("start")
+        url = 'http://127.0.0.1:7861/docs'
+        n = 0
+        while n != 200:
+            time.sleep(2)
+            try:
+                r = requests.get(url, timeout=3)
+                r.raise_for_status()
+                n = r.status_code
+                print(r.status_code)
+            except requests.exceptions.HTTPError as errh:
+                print("Http Error:", errh)
+            except requests.exceptions.ConnectionError as errc:
+                print("Error Connecting:", errc)
+            except requests.exceptions.Timeout as errt:
+                print("Timeout Error:", errt)
+            except requests.exceptions.RequestException as err:
+                print("OOps: Something Else", err)
         sd = "✅"
         await callback.message.edit_text(
             "SD запущена\n" + getTxt(), reply_markup=getStart()
@@ -330,13 +320,17 @@ async def inl_status(message: Union[types.Message, types.CallbackQuery]) -> None
 
 # Вывод прогресса в заменяемое сообщение
 async def getProgress(msgTime):
+    points = '.'
     while True:
         # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
-        await asyncio.sleep(2)
+        await asyncio.sleep(1)
+        proc = round(api.get_progress()['progress']*100)
+        points = '.' * (proc % 9)
+        print(points)
         await bot.edit_message_text(
             chat_id=msgTime.chat.id,
             message_id=msgTime.message_id,
-            text=str(round(api.get_progress()['progress']*100))+'%'
+            text=str(proc)+'% ' + points
         )
 
 @dp.message_handler(commands=["gen"])
@@ -377,7 +371,6 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
     await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
 
 # Получить меню действий с промптами
-@dp.message_handler(commands=["prompt"])
 @dp.callback_query_handler(text="prompt")
 async def cmd_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("cmd_prompt")

@@ -57,6 +57,7 @@ sd = "❌"
 data = getAttrtxt2img()
 data['prompt'] = 'cat in space' # Ý
 data['steps'] = 15
+data['sampler_name'] = 'Euler a'
 dataParams = {"img_thumb": "true", "img_tg": "true", "img_real": "true"}
 dataOld = data.copy()
 dataOldParams = dataParams.copy()
@@ -187,7 +188,7 @@ async def getProgress(msgTime):
         await bot.edit_message_text(
             chat_id=msgTime.chat.id,
             message_id=msgTime.message_id,
-            text=str(proc)+'% ' + points
+            text=str(proc)+'% ' + points# + str(int(time.time() * 1000))
         )
 
 # -------- MENU ----------
@@ -202,7 +203,7 @@ def getKeyboard(keysArr, returnAll):
 
 # Стандартное меню
 async def getKeyboardUnion(txt, message, keyboard, parse_mode = 'Markdown'):
-    # Если команда /settings
+    # Если команда с слешем
     if hasattr(message, "content_type"):
         await bot.send_message(
             chat_id=message.from_user.id,
@@ -232,9 +233,10 @@ def getStart(returnAll=1) -> InlineKeyboardMarkup:
 # Меню опций
 def getOpt(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
-        InlineKeyboardButton("settings", callback_data="settings"),
+        InlineKeyboardButton("sttngs", callback_data="sttngs"),
         InlineKeyboardButton("scripts",  callback_data="scripts"),
         InlineKeyboardButton("mdl",      callback_data="mdl"),
+        InlineKeyboardButton("smplr",      callback_data="smplr"),
         InlineKeyboardButton("prompt",   callback_data="prompt"),
     ]
     return (getKeyboard(keysArr, returnAll))
@@ -268,22 +270,29 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
 def getTxt():
     return "/start /opt /gen /skip /help"
 
-# get all models from stable-diffusion-webui\models\Stable-diffusion
-def get_models():
-    models = api.get_sd_models()
+def set_array(arrAll, itemArr, callback_data):
     arr = []
     arr2 = []
     i = 1
-    for item in models:
-        arr.append(InlineKeyboardButton(item['model_name'], callback_data='models|'+item['model_name']))
+    for item in arrAll:
+        arr.append(InlineKeyboardButton(item[itemArr], callback_data=callback_data+'|'+item[itemArr]))
         if i % 3 == 0:
              arr2.append(arr)
              arr = []
         i += 1
     if arr != []:
         arr2.append(arr)
-    print(arr2)
     return arr2
+
+# get all models from stable-diffusion-webui\models\Stable-diffusion
+def get_models():
+    models = api.get_sd_models()
+    return set_array(models, 'model_name', 'models')
+
+# get samplers
+def get_samplers_list():
+    samplers = api.get_samplers()
+    return set_array(samplers, 'name', 'samplers')
 
 # -------- COMMANDS ----------
 
@@ -389,6 +398,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
     # Включаем асинхрон, чтоб заработал await api.txt2img
     data["use_async"] = "True"
     asyncio.create_task(getProgress(msgTime))
+    # TODO try catch if wrong data
     res = await api.txt2img(**data)
     if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
         await bot.send_media_group(
@@ -426,11 +436,11 @@ async def cmd_opt(message: Union[types.Message, types.CallbackQuery]) -> None:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
     await getKeyboardUnion("Опции", message, keyboard)
 
-# Вызов settings
-@dp.message_handler(commands=["settings"])
-@dp.callback_query_handler(text="settings")
-async def inl_settings(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_settings")
+# Вызов sttngs
+@dp.message_handler(commands=["sttngs"])
+@dp.callback_query_handler(text="sttngs")
+async def inl_sttngs(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_sttngs")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Настройки", message, keyboard)
 
@@ -450,6 +460,21 @@ async def inl_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
     global sd
     if sd == '✅':
         menu = get_models()
+        menu.append(getOpt(0))
+        menu.append(getStart(0))
+        await getKeyboardUnion("Скрипты", message, InlineKeyboardMarkup(inline_keyboard=menu))
+    else:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
+        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
+
+# Вызов get_samplers
+@dp.message_handler(commands=["smplr"])
+@dp.callback_query_handler(text="smplr")
+async def inl_smplr(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_smplr")
+    global sd
+    if sd == '✅':
+        menu = get_samplers_list()
         menu.append(getOpt(0))
         menu.append(getStart(0))
         await getKeyboardUnion("Скрипты", message, InlineKeyboardMarkup(inline_keyboard=menu))
@@ -578,6 +603,20 @@ async def inl_models(callback: types.CallbackQuery) -> None:
     menu.append(getOpt(0))
     menu.append(getStart(0))
     await getKeyboardUnion('Теперь модель = ' + str(mdl), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
+
+# тыкнули на сэмплер
+@dp.callback_query_handler(text_startswith="samplers")
+async def inl_samplers(callback: types.CallbackQuery) -> None:
+    print('inl_samplers')
+    smplr = callback.data.split("|")[1]
+    options = {}
+    options['sampler_name'] = smplr
+    api.set_options(options)
+    data['sampler_name'] = smplr # Ý
+    menu = get_samplers_list()
+    menu.append(getOpt(0))
+    menu.append(getStart(0))
+    await getKeyboardUnion('Теперь сэмплер = ' + str(smplr), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
 
 # Ввели любой текст
 @dp.message_handler(lambda message: True)

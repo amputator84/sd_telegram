@@ -225,7 +225,6 @@ def getStart(returnAll=1) -> InlineKeyboardMarkup:
         InlineKeyboardButton("opt",      callback_data="opt"),
         InlineKeyboardButton("gen",      callback_data="gen"),
         InlineKeyboardButton("skip",     callback_data="skip"),
-        InlineKeyboardButton("status",   callback_data="status"),
         InlineKeyboardButton("help",     callback_data="help"),
     ]
     return (getKeyboard(keysArr, returnAll))
@@ -244,6 +243,8 @@ def getOpt(returnAll=1) -> InlineKeyboardMarkup:
 def getScripts(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("get_lora", callback_data="get_lora"),
+        InlineKeyboardButton("rnd_mdl", callback_data="rnd_mdl"),
+        InlineKeyboardButton("rnd_smp", callback_data="rnd_smp"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -264,7 +265,7 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
 
 # Меню текста
 def getTxt():
-    return "/start /opt /gen /skip /status /help"
+    return "/start /opt /gen /skip /help"
 
 # -------- COMMANDS ----------
 
@@ -334,12 +335,26 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
     txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard)
 
-# Обработчик команды /status
-@dp.message_handler(commands=["status"])
-@dp.callback_query_handler(text="status")
-async def inl_status(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print(inl_status)
-    print(api.get_progress()["eta_relative"])
+# Обработчик команды /skip
+@dp.message_handler(commands=["skip"])
+@dp.callback_query_handler(text="skip")
+async def inl_skip(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print('inl_skip')
+    # Создаем сессию
+    async with aiohttp.ClientSession() as session:
+        # Отправляем POST-запрос ко второму сервису
+        async with session.post(local + "/sdapi/v1/skip"):
+            # Получаем ответ и выводим его
+            #await response.json()
+            if hasattr(message, "content_type"):
+                await message.answer("skip")
+            else:
+                await bot.edit_message_text(
+                    chat_id=message.message.chat.id,
+                    message_id=message.message.message_id,
+                    text="Пропущено",
+                    reply_markup=getStart(),
+                )
 
 @dp.message_handler(commands=["gen"])
 @dp.callback_query_handler(text="gen")
@@ -420,6 +435,65 @@ async def inl_change_param(callback: types.CallbackQuery) -> None:
     json_str_params = "\n".join(json_list_params)
     await callback.message.edit_text(
         f"JSON параметры:\n{json_str}\n{json_str_params}", reply_markup=keyboard
+    )
+
+# script random gen from models
+@dp.message_handler(commands=["rnd_mdl"])
+@dp.callback_query_handler(text='rnd_mdl')
+async def rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print('rnd_mdl')
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
+    if hasattr(message, "content_type"):
+        chatId = message.chat.id
+    else:
+        chatId = message.message.chat.id
+    models = api.util_get_model_names()
+    numbers = list(range(len(models)))
+    random.shuffle(numbers)
+    # Включаем асинхрон, чтоб заработал await api.txt2img
+    await bot.send_message(
+        chat_id=chatId,
+        text='Цикл по '+str(len(models)) + ' моделям'  # data["prompt"] + "\n" + str(res.info["all_seeds"]) + models[number],
+    )
+    data["use_async"] = "True"
+    for i, number in enumerate(numbers):
+        api.util_wait_for_ready()
+        api.util_set_model(models[number])
+        msgTime = await bot.send_message(
+            chat_id=chatId,
+            text='Начали'
+        )
+        asyncio.create_task(getProgress(msgTime))
+        res = await api.txt2img(**data)
+        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "thumbs")
+            )
+        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "tg")
+            )
+        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "real")
+            )
+        await bot.send_message(
+            chat_id=chatId,
+            text=models[number] #data["prompt"] + "\n" + str(res.info["all_seeds"]) + models[number],
+        )
+
+        # Удаляем сообщение с прогрессом
+        await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+    await bot.send_message(
+        chat_id=chatId,
+        text="Готово \n"+str(data['prompt']) +
+                    "\n cfg_scale = " + str(data['cfg_scale']) +
+                    "\n width = " + str(data['width']) +
+                    "\n height = " + str(data['height']) +
+                    "\n steps = " + str(data['steps']) +
+                    "\n negative = " + str(data['negative_prompt'])
+        ,
+        reply_markup=keyboard
     )
 
 # Получить LORA

@@ -201,14 +201,14 @@ def getKeyboard(keysArr, returnAll):
         return keys
 
 # Стандартное меню
-async def getKeyboardUnion(txt, message, keyboard):
+async def getKeyboardUnion(txt, message, keyboard, parse_mode = 'Markdown'):
     # Если команда /settings
     if hasattr(message, "content_type"):
         await bot.send_message(
             chat_id=message.from_user.id,
             text=txt,
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode=parse_mode
         )
     else:
         await bot.edit_message_text(
@@ -216,7 +216,7 @@ async def getKeyboardUnion(txt, message, keyboard):
             message_id=message.message.message_id,
             text=txt,
             reply_markup=keyboard,
-            parse_mode="Markdown"
+            parse_mode=parse_mode
         )
 
 def getStart(returnAll=1) -> InlineKeyboardMarkup:
@@ -233,8 +233,9 @@ def getStart(returnAll=1) -> InlineKeyboardMarkup:
 def getOpt(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("settings", callback_data="settings"),
-        InlineKeyboardButton("scripts", callback_data="scripts"),
-        InlineKeyboardButton("prompt", callback_data="prompt"),
+        InlineKeyboardButton("scripts",  callback_data="scripts"),
+        InlineKeyboardButton("mdl",      callback_data="mdl"),
+        InlineKeyboardButton("prompt",   callback_data="prompt"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -243,8 +244,8 @@ def getOpt(returnAll=1) -> InlineKeyboardMarkup:
 def getScripts(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("get_lora", callback_data="get_lora"),
-        InlineKeyboardButton("rnd_mdl", callback_data="rnd_mdl"),
-        InlineKeyboardButton("rnd_smp", callback_data="rnd_smp"),
+        InlineKeyboardButton("rnd_mdl",  callback_data="rnd_mdl"),
+        InlineKeyboardButton("rnd_smp",  callback_data="rnd_smp"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -253,7 +254,7 @@ def getScripts(returnAll=1) -> InlineKeyboardMarkup:
 def getSet(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("change_param", callback_data="change_param"),
-        InlineKeyboardButton("reset_param", callback_data="reset_param"),
+        InlineKeyboardButton("reset_param",  callback_data="reset_param"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -266,6 +267,23 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
 # Меню текста
 def getTxt():
     return "/start /opt /gen /skip /help"
+
+# get all models from stable-diffusion-webui\models\Stable-diffusion
+def get_models():
+    models = api.get_sd_models()
+    arr = []
+    arr2 = []
+    i = 1
+    for item in models:
+        arr.append(InlineKeyboardButton(item['model_name'], callback_data='models|'+item['model_name']))
+        if i % 3 == 0:
+             arr2.append(arr)
+             arr = []
+        i += 1
+    if arr != []:
+        arr2.append(arr)
+    print(arr2)
+    return arr2
 
 # -------- COMMANDS ----------
 
@@ -424,6 +442,21 @@ async def inl_scripts(message: Union[types.Message, types.CallbackQuery]) -> Non
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Скрипты", message, keyboard)
 
+# Вызов get_models
+@dp.message_handler(commands=["mdl"])
+@dp.callback_query_handler(text="mdl")
+async def inl_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_mdl")
+    global sd
+    if sd == '✅':
+        menu = get_models()
+        menu.append(getOpt(0))
+        menu.append(getStart(0))
+        await getKeyboardUnion("Скрипты", message, InlineKeyboardMarkup(inline_keyboard=menu))
+    else:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
+        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
+
 # Вызов change_param
 @dp.callback_query_handler(text="change_param")
 async def inl_change_param(callback: types.CallbackQuery) -> None:
@@ -453,7 +486,7 @@ async def rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
     # Включаем асинхрон, чтоб заработал await api.txt2img
     await bot.send_message(
         chat_id=chatId,
-        text='Цикл по '+str(len(models)) + ' моделям'  # data["prompt"] + "\n" + str(res.info["all_seeds"]) + models[number],
+        text='Цикл по '+str(len(models)) + ' моделям'
     )
     data["use_async"] = "True"
     for i, number in enumerate(numbers):
@@ -479,7 +512,7 @@ async def rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
             )
         await bot.send_message(
             chat_id=chatId,
-            text=models[number] #data["prompt"] + "\n" + str(res.info["all_seeds"]) + models[number],
+            text=models[number]
         )
 
         # Удаляем сообщение с прогрессом
@@ -533,6 +566,18 @@ async def get_lxc_prompt(message: Union[types.Message, types.CallbackQuery]) -> 
 async def random_prompt(callback: types.CallbackQuery) -> None:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
     await getKeyboardUnion(get_random_prompt(), callback, keyboard)
+
+# тыкнули на модельку
+@dp.callback_query_handler(text_startswith="models")
+async def inl_models(callback: types.CallbackQuery) -> None:
+    print('inl_models')
+    mdl = callback.data.split("|")[1]
+    api.util_set_model(mdl)
+    api.util_wait_for_ready()
+    menu = get_models()
+    menu.append(getOpt(0))
+    menu.append(getStart(0))
+    await getKeyboardUnion('Теперь модель = ' + str(mdl), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
 
 # Ввели любой текст
 @dp.message_handler(lambda message: True)

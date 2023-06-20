@@ -19,6 +19,7 @@ import json
 import requests
 import asyncio
 import os
+import random
 from datetime import datetime
 import aiohttp
 from typing import Union
@@ -90,6 +91,9 @@ def stop_sd():
         process.terminate()
         process = None
         sd = "❌"
+
+def submit_get(url: str, data: dict):
+    return requests.get(url, data=json.dumps(data))
 
 def pilToImages(res, typeImages="tg"):
     media_group = []
@@ -163,10 +167,28 @@ def get_random_prompt():
     prompt = tokenizer.decode(txt[0], skip_special_tokens=True)
     return prompt
 
+def rnd_prmt_lxc():
+    txt = random.choice(submit_get('https://lexica.art/api/v1/search?q='+data['prompt'], '').json()['images'])['prompt']
+    return txt
+
 # Translate
 def translateRuToEng(text):
     translator = Translator(from_lang="ru", to_lang="en")
     return translator.translate(text)
+
+# Вывод прогресса в заменяемое сообщение
+async def getProgress(msgTime):
+    points = '.'
+    while True:
+        # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
+        await asyncio.sleep(1)
+        proc = round(api.get_progress()['progress']*100)
+        points = '.' * (proc % 9)
+        await bot.edit_message_text(
+            chat_id=msgTime.chat.id,
+            message_id=msgTime.message_id,
+            text=str(proc)+'% ' + points
+        )
 
 # -------- MENU ----------
 # Стартовое меню
@@ -234,9 +256,10 @@ def getSet(returnAll=1) -> InlineKeyboardMarkup:
     ]
     return (getKeyboard(keysArr, returnAll))
 
-# Меню настроек
+# Меню промпта
 def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
-    keysArr = [InlineKeyboardButton("random_prompt", callback_data="random_prompt")]
+    keysArr = [InlineKeyboardButton("random_prompt", callback_data="random_prompt"),
+               InlineKeyboardButton("lxc_prompt", callback_data="lxc_prompt"),]
     return (getKeyboard(keysArr, returnAll))
 
 # Меню текста
@@ -317,21 +340,6 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
 async def inl_status(message: Union[types.Message, types.CallbackQuery]) -> None:
     print(inl_status)
     print(api.get_progress()["eta_relative"])
-
-# Вывод прогресса в заменяемое сообщение
-async def getProgress(msgTime):
-    points = '.'
-    while True:
-        # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
-        await asyncio.sleep(1)
-        proc = round(api.get_progress()['progress']*100)
-        points = '.' * (proc % 9)
-        print(points)
-        await bot.edit_message_text(
-            chat_id=msgTime.chat.id,
-            message_id=msgTime.message_id,
-            text=str(proc)+'% ' + points
-        )
 
 @dp.message_handler(commands=["gen"])
 @dp.callback_query_handler(text="gen")
@@ -438,45 +446,19 @@ async def getLora(message: Union[types.Message, types.CallbackQuery]) -> None:
         arr = arr + f"`<lora:{name}:1>`\n\n"
     await getKeyboardUnion(arr, message, keyboard)
 
+# Рандомный промпт с lexica.art на основе data['prompt']
+@dp.message_handler(commands=["lxc_prompt"])
+@dp.callback_query_handler(text="lxc_prompt")
+async def get_lxc_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("get_lxc_prompt")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
+    txt = rnd_prmt_lxc()
+    await getKeyboardUnion(txt, message, keyboard)
+
 @dp.callback_query_handler(text="random_prompt")
 async def random_prompt(callback: types.CallbackQuery) -> None:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
-    await bot.send_message(chat_id=callback.from_user.id, text=get_random_prompt(), reply_markup=keyboard)
-
-@dp.message_handler(commands=["test"])
-async def cmd_test(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("cmd_test")
-    #print(api.get_options())
-    #options = {}
-    #options['outdir_txt2img_samples'] = '../../outputs/txt2img-images'
-    #api.set_options(options)
-    #print(api.get_options())
-
-    #getAttrtxt2img() # options default
-    #options = {}
-    #options['ttt'] = '11'
-    #api.set_options(options)
-    #print(api.get_options())
-    translator = Translator(from_lang="ru", to_lang="en")
-
-    text = 'толстый кот в машине'
-
-    translation = translator.translate(text)
-
-    print(translation)
-
-@dp.message_handler(commands=["start2"])
-async def cmd_start2(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("cmd_start2")
-    subprocess.Popen(
-        ["python", "../../launch.py", "--nowebui"] # , "--xformers"
-    )
-
-@dp.message_handler(commands=["test2"])
-async def cmd_test2(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("cmd_test2")
-    print(getAttrtxt2img()['enable_hr'])
-    print(data['enable_hr'])
+    await getKeyboardUnion(get_random_prompt(), callback, keyboard)
 
 # Ввели любой текст
 @dp.message_handler(lambda message: True)

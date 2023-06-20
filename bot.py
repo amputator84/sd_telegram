@@ -233,11 +233,12 @@ def getStart(returnAll=1) -> InlineKeyboardMarkup:
 # Меню опций
 def getOpt(returnAll=1) -> InlineKeyboardMarkup:
     keysArr = [
-        InlineKeyboardButton("sttngs", callback_data="sttngs"),
-        InlineKeyboardButton("scripts",  callback_data="scripts"),
-        InlineKeyboardButton("mdl",      callback_data="mdl"),
-        InlineKeyboardButton("smplr",      callback_data="smplr"),
-        InlineKeyboardButton("prompt",   callback_data="prompt"),
+        InlineKeyboardButton("sttngs",  callback_data="sttngs"),
+        InlineKeyboardButton("scrpts",  callback_data="scrpts"),
+        InlineKeyboardButton("mdl",     callback_data="mdl"),
+        InlineKeyboardButton("smplr",   callback_data="smplr"),
+        InlineKeyboardButton("hr",      callback_data="hr"),
+        InlineKeyboardButton("prompt",  callback_data="prompt"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -270,12 +271,18 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
 def getTxt():
     return "/start /opt /gen /skip /help"
 
-def set_array(arrAll, itemArr, callback_data):
+def set_array(arrAll, itemArr, callback_data, useIn = 1):
+    print('set_array')
+    print(arrAll)
     arr = []
     arr2 = []
     i = 1
     for item in arrAll:
-        arr.append(InlineKeyboardButton(item[itemArr], callback_data=callback_data+'|'+item[itemArr]))
+        if useIn == 1:
+            arrayIn = item[itemArr]
+        else:
+            arrayIn = item
+        arr.append(InlineKeyboardButton(arrayIn, callback_data=callback_data+'|'+arrayIn))
         if i % 3 == 0:
              arr2.append(arr)
              arr = []
@@ -293,6 +300,11 @@ def get_models():
 def get_samplers_list():
     samplers = api.get_samplers()
     return set_array(samplers, 'name', 'samplers')
+
+# get hr
+def get_hr_list():
+    hrs = [str(choice.value) for choice in webuiapi.HiResUpscaler]
+    return set_array(hrs, 'hr', 'hrs', 0)
 
 # -------- COMMANDS ----------
 
@@ -445,10 +457,10 @@ async def inl_sttngs(message: Union[types.Message, types.CallbackQuery]) -> None
     await getKeyboardUnion("Настройки", message, keyboard)
 
 # Вызов script
-@dp.message_handler(commands=["scripts"])
-@dp.callback_query_handler(text="scripts")
-async def inl_scripts(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_scripts")
+@dp.message_handler(commands=["scrpts"])
+@dp.callback_query_handler(text="scrpts")
+async def inl_scrpts(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_scrpts")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Скрипты", message, keyboard)
 
@@ -469,6 +481,7 @@ async def inl_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
 
 # Вызов get_samplers
 @dp.message_handler(commands=["smplr"])
+@dp.message_handler(commands=["sampler_name"])
 @dp.callback_query_handler(text="smplr")
 async def inl_smplr(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("inl_smplr")
@@ -478,6 +491,22 @@ async def inl_smplr(message: Union[types.Message, types.CallbackQuery]) -> None:
         menu.append(getOpt(0))
         menu.append(getStart(0))
         await getKeyboardUnion("Скрипты", message, InlineKeyboardMarkup(inline_keyboard=menu))
+    else:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
+        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
+
+# Вызов get_hr_list
+@dp.message_handler(commands=["hr"])
+@dp.message_handler(commands=["hr_upscaler"])
+@dp.callback_query_handler(text="hr")
+async def inl_hr(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_hr")
+    global sd
+    if sd == '✅':
+        menu = get_hr_list()
+        menu.append(getOpt(0))
+        menu.append(getStart(0))
+        await getKeyboardUnion("HiResUpscaler", message, InlineKeyboardMarkup(inline_keyboard=menu))
     else:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
         await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
@@ -618,34 +647,39 @@ async def inl_samplers(callback: types.CallbackQuery) -> None:
     menu.append(getStart(0))
     await getKeyboardUnion('Теперь сэмплер = ' + str(smplr), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
 
+# тыкнули на hr_upscaler
+@dp.callback_query_handler(text_startswith="hrs")
+async def inl_hrs(callback: types.CallbackQuery) -> None:
+    print('inl_hrs')
+    hrs = callback.data.split("|")[1]
+    options = {}
+    options['hr_upscaler'] = hrs
+    api.set_options(options)
+    data['hr_upscaler'] = hrs # Ý
+    menu = get_hr_list()
+    menu.append(getOpt(0))
+    menu.append(getStart(0))
+    await getKeyboardUnion('Теперь hr_upscaler = ' + str(hrs), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
+
 # Ввели любой текст
 @dp.message_handler(lambda message: True)
 async def change_json(message: types.Message):
     print("change_json")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
     text = message.text
-    print(514)
-    print(text)
     nam = text.split()[0][1:]  # txt из /txt 321
     state_names = [attr for attr in dir(Form) if isinstance(getattr(Form, attr), State)]
-    print(516)
-    print(nam)
-    print(state_names)
     args = message.get_args()  # это 321, когда ввели /txt 321
     # Поиск команд из data
     if nam in state_names:
-        print(524)
         if args == "":
-            print(526)
             await message.answer("Напиши любое " + nam)
-            print(528)
             if nam in state_names:
                 await getattr(Form, nam).set()
             else:
                 print("Ошибка какая-то")
         else:
             # /txt 321 пишем 321 в data['txt']
-            print(533)
             data[nam] = args
             # TODO answer поменять на edit_text
             await message.answer(

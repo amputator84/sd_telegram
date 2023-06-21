@@ -373,7 +373,7 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
     dataParams = dataOldParams
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
-    await getKeyboardUnion(txt, message, keyboard)
+    await getKeyboardUnion(txt, message, keyboard, '')
 
 # Обработчик команды /skip
 @dp.message_handler(commands=["skip"])
@@ -403,7 +403,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         chatId = message.chat.id
     else:
         chatId = message.message.chat.id
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     msgTime = await bot.send_message(
         chat_id=chatId,
         text='Начали'
@@ -528,8 +528,8 @@ async def inl_change_param(callback: types.CallbackQuery) -> None:
 # script random gen from models
 @dp.message_handler(commands=["rnd_mdl"])
 @dp.callback_query_handler(text='rnd_mdl')
-async def rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print('rnd_mdl')
+async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print('inl_rnd_mdl')
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
     if hasattr(message, "content_type"):
         chatId = message.chat.id
@@ -568,6 +568,70 @@ async def rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
         await bot.send_message(
             chat_id=chatId,
             text=models[number]
+        )
+
+        # Удаляем сообщение с прогрессом
+        await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+    await bot.send_message(
+        chat_id=chatId,
+        text="Готово \n"+str(data['prompt']) +
+                    "\n cfg_scale = " + str(data['cfg_scale']) +
+                    "\n width = " + str(data['width']) +
+                    "\n height = " + str(data['height']) +
+                    "\n steps = " + str(data['steps']) +
+                    "\n negative = " + str(data['negative_prompt'])
+        ,
+        reply_markup=keyboard
+    )
+
+
+# script random gen from models
+@dp.message_handler(commands=["rnd_smp"])
+@dp.callback_query_handler(text='rnd_smp')
+async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print('inl_rnd_smp')
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
+    if hasattr(message, "content_type"):
+        chatId = message.chat.id
+    else:
+        chatId = message.message.chat.id
+    samplers = api.get_samplers()
+    numbers = list(range(len(samplers)))
+    random.shuffle(numbers)
+    # Включаем асинхрон, чтоб заработал await api.txt2img
+    await bot.send_message(
+        chat_id=chatId,
+        text='Цикл по '+str(len(samplers)) + ' семплерам'
+    )
+    #data["use_async"] = "True"
+    for i, number in enumerate(numbers):
+        #api.util_wait_for_ready()
+        #api.util_set_model(samplers[number])
+        options = {}
+        options['sampler_name'] = samplers[number]
+        api.set_options(options)
+        data['sampler_name'] = samplers[number]  # Ý
+        msgTime = await bot.send_message(
+            chat_id=chatId,
+            text='Начали'
+        )
+        asyncio.create_task(getProgress(msgTime))
+        res = await api.txt2img(**data)
+        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "thumbs")
+            )
+        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "tg")
+            )
+        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "real")
+            )
+        await bot.send_message(
+            chat_id=chatId,
+            text=samplers[number]
         )
 
         # Удаляем сообщение с прогрессом

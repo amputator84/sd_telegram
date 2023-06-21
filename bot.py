@@ -29,7 +29,7 @@ import inspect
 from translate import Translator
 
 # from https://t.me/BotFather
-API_TOKEN = "TOKEN_HERE"
+API_TOKEN = "900510503:AAG5Xug_JEERhKlf7dpOpzxXcJIzlTbWX1M"
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -270,7 +270,7 @@ def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
 
 # Меню текста
 def getTxt():
-    return "/start /opt /gen /skip /help"
+    return "/start /opt /gen /skip /stop /help"
 
 def set_array(arrAll, itemArr, callback_data, useIn = 1):
     print('set_array')
@@ -320,47 +320,58 @@ async def cmd_start(message: Union[types.Message, types.CallbackQuery]) -> None:
 
 # TODO optimize
 # Запуск/Остановка SD. Завязываемся на глобальную иконку sd
+@dp.message_handler(commands=["stop"])
 @dp.callback_query_handler(text="sd")
-async def inl_sd(callback: types.CallbackQuery) -> None:
+async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
     print("inl_sd")
     global sd
-    if sd == '✅':
-        stop_sd()
-        sd = "⌛"
-        await callback.message.edit_text(
-            "Останавливаем SD\n" + getTxt(), reply_markup=getStart()
-        )
-        sd = '❌'
-        await callback.message.edit_text(
-            "SD остановлена\n" + getTxt(), reply_markup=getStart()
-        )
+    if hasattr(message, "content_type"):
+        if message.text == '/stop':
+            await inl_skip(message)
+            stop_sd()
+            await bot.send_message(
+                chat_id=message.chat.id,
+                text = "Останавливаем SD\n" + getTxt(),
+                reply_markup=getStart()
+            )
     else:
-        start_sd()
-        sd = "⌛"
-        await callback.message.edit_text(
-            "Запускаем SD\n" + getTxt(), reply_markup=getStart()
-        )
-        url = 'http://127.0.0.1:7861/docs'
-        n = 0
-        while n != 200:
-            time.sleep(2)
-            try:
-                r = requests.get(url, timeout=3)
-                r.raise_for_status()
-                n = r.status_code
-                print(r.status_code)
-            except requests.exceptions.HTTPError as errh:
-                print("Http Error:", errh)
-            except requests.exceptions.ConnectionError as errc:
-                print("Error Connecting:", errc)
-            except requests.exceptions.Timeout as errt:
-                print("Timeout Error:", errt)
-            except requests.exceptions.RequestException as err:
-                print("OOps: Something Else", err)
-        sd = "✅"
-        await callback.message.edit_text(
-            "SD запущена\n" + getTxt(), reply_markup=getStart()
-        )
+        if sd == '✅':
+            stop_sd()
+            sd = "⌛"
+            await message.message.edit_text(
+                "Останавливаем SD\n" + getTxt(), reply_markup=getStart()
+            )
+            sd = '❌'
+            await message.message.edit_text(
+                "SD остановлена\n" + getTxt(), reply_markup=getStart()
+            )
+        else:
+            start_sd()
+            sd = "⌛"
+            await message.message.edit_text(
+                "Запускаем SD\n" + getTxt(), reply_markup=getStart()
+            )
+            url = 'http://127.0.0.1:7861/docs'
+            n = 0
+            while n != 200:
+                time.sleep(2)
+                try:
+                    r = requests.get(url, timeout=3)
+                    r.raise_for_status()
+                    n = r.status_code
+                    print(r.status_code)
+                except requests.exceptions.HTTPError as errh:
+                    print("Http Error:", errh)
+                except requests.exceptions.ConnectionError as errc:
+                    print("Error Connecting:", errc)
+                except requests.exceptions.Timeout as errt:
+                    print("Timeout Error:", errt)
+                except requests.exceptions.RequestException as err:
+                    print("OOps: Something Else", err)
+            sd = "✅"
+            await message.message.edit_text(
+                "SD запущена\n" + getTxt(), reply_markup=getStart()
+            )
 
 # Вызов reset_param, сброс JSON
 @dp.message_handler(commands=["reset_param"])
@@ -543,16 +554,16 @@ async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> Non
         chat_id=chatId,
         text='Цикл по '+str(len(models)) + ' моделям'
     )
-    data["use_async"] = "True"
+    data["use_async"] = "False"
     for i, number in enumerate(numbers):
         api.util_wait_for_ready()
         api.util_set_model(models[number])
-        msgTime = await bot.send_message(
-            chat_id=chatId,
-            text='Начали'
-        )
-        asyncio.create_task(getProgress(msgTime))
-        res = await api.txt2img(**data)
+        #msgTime = await bot.send_message(
+        #    chat_id=chatId,
+        #    text='Начали'
+        #)
+        #asyncio.create_task(getProgress(msgTime))
+        res = api.txt2img(**data)
         if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
             await bot.send_media_group(
                 chat_id=chatId, media=pilToImages(res, "thumbs")
@@ -571,7 +582,7 @@ async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> Non
         )
 
         # Удаляем сообщение с прогрессом
-        await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+        #await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
     await bot.send_message(
         chat_id=chatId,
         text="Готово \n"+str(data['prompt']) +
@@ -603,19 +614,20 @@ async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> Non
         chat_id=chatId,
         text='Цикл по '+str(len(samplers)) + ' семплерам'
     )
-    #data["use_async"] = "True"
+    data["use_async"] = "True"
     for i, number in enumerate(numbers):
+        time.sleep(2)
         #api.util_wait_for_ready()
         #api.util_set_model(samplers[number])
         options = {}
         options['sampler_name'] = samplers[number]
         api.set_options(options)
         data['sampler_name'] = samplers[number]  # Ý
-        msgTime = await bot.send_message(
-            chat_id=chatId,
-            text='Начали'
-        )
-        asyncio.create_task(getProgress(msgTime))
+        #msgTime = await bot.send_message(
+        #    chat_id=chatId,
+        #    text='Начали'
+        #)
+        #asyncio.create_task(getProgress(msgTime))
         res = await api.txt2img(**data)
         if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
             await bot.send_media_group(
@@ -635,7 +647,7 @@ async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> Non
         )
 
         # Удаляем сообщение с прогрессом
-        await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+        #await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
     await bot.send_message(
         chat_id=chatId,
         text="Готово \n"+str(data['prompt']) +
@@ -647,6 +659,80 @@ async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> Non
         ,
         reply_markup=keyboard
     )
+
+@dp.message_handler(commands=["test"])
+@dp.callback_query_handler(text='test')
+async def inl_test(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print('inl_test')
+    print(api.get_options())
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
+    if hasattr(message, "content_type"):
+        chatId = message.chat.id
+    else:
+        chatId = message.message.chat.id
+    if api:
+        samplers = api.get_samplers()
+        numbers = list(range(len(samplers)))
+        random.shuffle(numbers)
+        # Включаем асинхрон, чтоб заработал await api.txt2img
+        await bot.send_message(
+            chat_id=chatId,
+            text='Цикл по '+str(len(samplers)) + ' семплерам'
+        )
+        data["use_async"] = "False"
+        await bot.send_message(
+            chat_id=chatId,
+            text=data
+        )
+
+        for i, number in enumerate(numbers):
+            #api.util_wait_for_ready()
+            #api.util_set_model(samplers[number])
+            options = {}
+            options['sampler_name'] = samplers[number]['name']
+            api.set_options(options)
+            data['sampler_name'] = samplers[number]['name']  # Ý
+            #msgTime = await bot.send_message(
+            #    chat_id=chatId,
+            #    text='Начали'
+            #)
+            #asyncio.create_task(getProgress(msgTime))
+            print(data)
+            print(700)
+            #print(**data)
+            print(api.get_options())
+            res = api.txt2img(**data)
+
+            if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+                await bot.send_media_group(
+                    chat_id=chatId, media=pilToImages(res, "thumbs")
+                )
+            if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+                await bot.send_media_group(
+                    chat_id=chatId, media=pilToImages(res, "tg")
+                )
+            if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+                await bot.send_media_group(
+                    chat_id=chatId, media=pilToImages(res, "real")
+                )
+            await bot.send_message(
+                chat_id=chatId,
+                text=samplers[number]['name']
+            )
+
+            # Удаляем сообщение с прогрессом
+            #await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+        await bot.send_message(
+            chat_id=chatId,
+            text="Готово \n"+str(data['prompt']) +
+                        "\n cfg_scale = " + str(data['cfg_scale']) +
+                        "\n width = " + str(data['width']) +
+                        "\n height = " + str(data['height']) +
+                        "\n steps = " + str(data['steps']) +
+                        "\n negative = " + str(data['negative_prompt'])
+            ,
+            reply_markup=keyboard
+        )
 
 # Получить LORA
 @dp.message_handler(commands=["get_lora"])

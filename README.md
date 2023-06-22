@@ -1,7 +1,7 @@
 # sd_telegram
 telegram bot on aiogram python 3.10.6 to generate images in automatic1111 locally
 
-create bot from [BotFather](https://t.me/BotFather) and use token in [API_TOKEN](https://github.com/amputator84/sd_telegram/blob/master/bot.py#L28)
+create bot from [BotFather](https://t.me/BotFather) and use token in [API_TOKEN](https://github.com/amputator84/sd_telegram/blob/master/bot.py#L32)
 
 the bot is installed in automatic1111 via extensions or use _git clone_ into _C:\stable-diffusion-webui\extensions\sd_telegram_
 

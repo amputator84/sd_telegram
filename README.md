@@ -49,6 +49,9 @@ skip one or all generations
 _**help**  
 help  
 
+<img src="https://raw.githubusercontent.com/amputator84/sd_telegram/master/photo_2023-06-22_15-29-24.jpg" alt="drawing" width="400"/>
+<img src="https://raw.githubusercontent.com/amputator84/sd_telegram/master/photo_2023-06-22_15-29-27.jpg" width="350"/>
+
 **TODO**  
 1. use share link (not yet possible, because the API is running in the background)  
 2. uploading Lora from TG

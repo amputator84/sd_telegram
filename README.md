@@ -27,10 +27,10 @@ reset to default
 __**scrpts**  
 ___**get_lora**  
 get list LORA`s from stable-diffusion-webui/models/Lora  
-___**rnd_mdl**
+___**rnd_mdl**  
 script for generating images for **all** models in **random** order, taking into account JSON settings  
 ___**rnd_smp**  
-script for generating images for one models with all samplers. TODO  
+script for generating images for one models with all samplers  
 __**mdl**  
 change model from list  
 __**smplr**  
@@ -38,14 +38,14 @@ change sampler from list
 __**hr**  
 change hr_upscale from list  
 __**prompt**  
-___**random_prompt**
+___**random_prompt**  
 get random prompt from GPT2Tokenizer FredZhang7 distilgpt2    
 ___**lxc_prompt**  
 get random prompt from lexica.art  
 _**gen**  
 generate images  
 _**skip**  
-skip one or all generations
+skip one or all generations  
 _**help**  
 help  
 
@@ -60,6 +60,7 @@ help
 8. Several prompts in one via ;
 9. Ability to send everything with one command with settings
 10. Preloading photos when waiting for a long time so that you can skip
+11. Uploading random.json from export TG channel
 
 **TNX**  
 [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui)  

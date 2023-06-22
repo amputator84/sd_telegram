@@ -29,7 +29,7 @@ import inspect
 from translate import Translator
 
 # from https://t.me/BotFather
-API_TOKEN = "900510503:AAG5Xug_JEERhKlf7dpOpzxXcJIzlTbWX1M"
+API_TOKEN = "TOKEN_HERE"
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()

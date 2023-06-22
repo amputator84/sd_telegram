@@ -86,7 +86,7 @@ def start_sd():
         process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers"])
         sd = "✅"
 
-def stop_sd():
+async def stop_sd():
     global process, sd
     if process:
         print('stop_process stop_sd')
@@ -307,6 +307,63 @@ def get_hr_list():
     hrs = [str(choice.value) for choice in webuiapi.HiResUpscaler]
     return set_array(hrs, 'hr', 'hrs', 0)
 
+# random
+async def rnd_script(message, typeScript):
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
+    if hasattr(message, "content_type"):
+        chatId = message.chat.id
+    else:
+        chatId = message.message.chat.id
+    if typeScript == 'models':
+        elements = api.util_get_model_names()
+    else:
+        elements = api.get_samplers()
+    numbers = list(range(len(elements)))
+    random.shuffle(numbers)
+    await bot.send_message(
+        chat_id=chatId,
+        text='Цикл по '+str(len(elements)) + (' моделям' if typeScript == 'models' else ' семплерам')
+    )
+
+    for i, number in enumerate(numbers):
+        if typeScript == 'models':
+            api.util_wait_for_ready()
+            api.util_set_model(elements[number])
+        else:
+            options = {}
+            options['sampler_name'] = elements[number]['name']
+            api.set_options(options)
+            data['sampler_name'] = elements[number]['name']  # Ý
+        data["use_async"] = False
+        res = api.txt2img(**data)
+        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "thumbs")
+            )
+        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "tg")
+            )
+        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "real")
+            )
+        await bot.send_message(
+            chat_id=chatId,
+            text=elements[number] if typeScript == 'models' else elements[number]['name']
+        )
+    await bot.send_message(
+        chat_id=chatId,
+        text="Готово \n"+str(data['prompt']) +
+                    "\n cfg_scale = " + str(data['cfg_scale']) +
+                    "\n width = " + str(data['width']) +
+                    "\n height = " + str(data['height']) +
+                    "\n steps = " + str(data['steps']) +
+                    "\n negative = " + str(data['negative_prompt'])
+        ,
+        reply_markup=keyboard
+    )
+
 # -------- COMMANDS ----------
 
 # start или help
@@ -328,7 +385,7 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
     if hasattr(message, "content_type"):
         if message.text == '/stop':
             await inl_skip(message)
-            stop_sd()
+            await stop_sd()
             await bot.send_message(
                 chat_id=message.chat.id,
                 text = "Останавливаем SD\n" + getTxt(),
@@ -336,7 +393,7 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
             )
     else:
         if sd == '✅':
-            stop_sd()
+            await stop_sd()
             sd = "⌛"
             await message.message.edit_text(
                 "Останавливаем SD\n" + getTxt(), reply_markup=getStart()
@@ -541,59 +598,7 @@ async def inl_change_param(callback: types.CallbackQuery) -> None:
 @dp.callback_query_handler(text='rnd_mdl')
 async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
     print('inl_rnd_mdl')
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
-    if hasattr(message, "content_type"):
-        chatId = message.chat.id
-    else:
-        chatId = message.message.chat.id
-    models = api.util_get_model_names()
-    numbers = list(range(len(models)))
-    random.shuffle(numbers)
-    # Включаем асинхрон, чтоб заработал await api.txt2img
-    await bot.send_message(
-        chat_id=chatId,
-        text='Цикл по '+str(len(models)) + ' моделям'
-    )
-    data["use_async"] = "False"
-    for i, number in enumerate(numbers):
-        api.util_wait_for_ready()
-        api.util_set_model(models[number])
-        #msgTime = await bot.send_message(
-        #    chat_id=chatId,
-        #    text='Начали'
-        #)
-        #asyncio.create_task(getProgress(msgTime))
-        res = api.txt2img(**data)
-        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "thumbs")
-            )
-        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "tg")
-            )
-        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "real")
-            )
-        await bot.send_message(
-            chat_id=chatId,
-            text=models[number]
-        )
-
-        # Удаляем сообщение с прогрессом
-        #await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
-    await bot.send_message(
-        chat_id=chatId,
-        text="Готово \n"+str(data['prompt']) +
-                    "\n cfg_scale = " + str(data['cfg_scale']) +
-                    "\n width = " + str(data['width']) +
-                    "\n height = " + str(data['height']) +
-                    "\n steps = " + str(data['steps']) +
-                    "\n negative = " + str(data['negative_prompt'])
-        ,
-        reply_markup=keyboard
-    )
+    await rnd_script(message, 'models')
 
 
 # script random gen from models
@@ -601,138 +606,8 @@ async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> Non
 @dp.callback_query_handler(text='rnd_smp')
 async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> None:
     print('inl_rnd_smp')
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
-    if hasattr(message, "content_type"):
-        chatId = message.chat.id
-    else:
-        chatId = message.message.chat.id
-    samplers = api.get_samplers()
-    numbers = list(range(len(samplers)))
-    random.shuffle(numbers)
-    # Включаем асинхрон, чтоб заработал await api.txt2img
-    await bot.send_message(
-        chat_id=chatId,
-        text='Цикл по '+str(len(samplers)) + ' семплерам'
-    )
-    data["use_async"] = "True"
-    for i, number in enumerate(numbers):
-        time.sleep(2)
-        #api.util_wait_for_ready()
-        #api.util_set_model(samplers[number])
-        options = {}
-        options['sampler_name'] = samplers[number]
-        api.set_options(options)
-        data['sampler_name'] = samplers[number]  # Ý
-        #msgTime = await bot.send_message(
-        #    chat_id=chatId,
-        #    text='Начали'
-        #)
-        #asyncio.create_task(getProgress(msgTime))
-        res = await api.txt2img(**data)
-        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "thumbs")
-            )
-        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "tg")
-            )
-        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "real")
-            )
-        await bot.send_message(
-            chat_id=chatId,
-            text=samplers[number]
-        )
+    await rnd_script(message, 'samplers')
 
-        # Удаляем сообщение с прогрессом
-        #await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
-    await bot.send_message(
-        chat_id=chatId,
-        text="Готово \n"+str(data['prompt']) +
-                    "\n cfg_scale = " + str(data['cfg_scale']) +
-                    "\n width = " + str(data['width']) +
-                    "\n height = " + str(data['height']) +
-                    "\n steps = " + str(data['steps']) +
-                    "\n negative = " + str(data['negative_prompt'])
-        ,
-        reply_markup=keyboard
-    )
-
-@dp.message_handler(commands=["test"])
-@dp.callback_query_handler(text='test')
-async def inl_test(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print('inl_test')
-    print(api.get_options())
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getSet(0), getStart(0)])
-    if hasattr(message, "content_type"):
-        chatId = message.chat.id
-    else:
-        chatId = message.message.chat.id
-    if api:
-        samplers = api.get_samplers()
-        numbers = list(range(len(samplers)))
-        random.shuffle(numbers)
-        # Включаем асинхрон, чтоб заработал await api.txt2img
-        await bot.send_message(
-            chat_id=chatId,
-            text='Цикл по '+str(len(samplers)) + ' семплерам'
-        )
-        data["use_async"] = "False"
-        await bot.send_message(
-            chat_id=chatId,
-            text=data
-        )
-
-        for i, number in enumerate(numbers):
-            #api.util_wait_for_ready()
-            #api.util_set_model(samplers[number])
-            options = {}
-            options['sampler_name'] = samplers[number]['name']
-            api.set_options(options)
-            data['sampler_name'] = samplers[number]['name']  # Ý
-            #msgTime = await bot.send_message(
-            #    chat_id=chatId,
-            #    text='Начали'
-            #)
-            #asyncio.create_task(getProgress(msgTime))
-            print(data)
-            print(700)
-            #print(**data)
-            print(api.get_options())
-            res = api.txt2img(**data)
-
-            if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-                await bot.send_media_group(
-                    chat_id=chatId, media=pilToImages(res, "thumbs")
-                )
-            if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-                await bot.send_media_group(
-                    chat_id=chatId, media=pilToImages(res, "tg")
-                )
-            if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-                await bot.send_media_group(
-                    chat_id=chatId, media=pilToImages(res, "real")
-                )
-            await bot.send_message(
-                chat_id=chatId,
-                text=samplers[number]['name']
-            )
-
-            # Удаляем сообщение с прогрессом
-            #await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
-        await bot.send_message(
-            chat_id=chatId,
-            text="Готово \n"+str(data['prompt']) +
-                        "\n cfg_scale = " + str(data['cfg_scale']) +
-                        "\n width = " + str(data['width']) +
-                        "\n height = " + str(data['height']) +
-                        "\n steps = " + str(data['steps']) +
-                        "\n negative = " + str(data['negative_prompt'])
-            ,
-            reply_markup=keyboard
-        )
 
 # Получить LORA
 @dp.message_handler(commands=["get_lora"])

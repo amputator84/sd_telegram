@@ -11,6 +11,7 @@ from aiogram.types import (
     CallbackQuery,
     InputMediaDocument,
     InputFile,
+    InputMediaPhoto,
 )
 import webuiapi, io
 import subprocess
@@ -27,6 +28,7 @@ from PIL import Image
 from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import inspect
 from translate import Translator
+import base64
 
 # from https://t.me/BotFather
 API_TOKEN = "TOKEN_HERE"
@@ -180,7 +182,6 @@ def translateRuToEng(text):
 
 # Вывод прогресса в заменяемое сообщение
 async def getProgress(msgTime):
-    points = '.'
     while True:
         # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
         await asyncio.sleep(1)
@@ -189,9 +190,72 @@ async def getProgress(msgTime):
         await bot.edit_message_text(
             chat_id=msgTime.chat.id,
             message_id=msgTime.message_id,
-            text=str(proc)+'% ' + points# + str(int(time.time() * 1000))
+            text=str(proc)+'% ' + points
         )
+#TODO
+async def getProgress2(msgTime):
+    points = '.'
+    while True:
+        # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
+        await asyncio.sleep(2)
+        print(187)
+        print(api.get_progress())
+        proc = round(api.get_progress()['progress']*100)
+        points = '.' * (proc % 9)
+        #await bot.edit_message_text(
+        #    chat_id=msgTime.chat.id,
+        #    message_id=msgTime.message_id,
+        #    #text=str(proc)+'% ' + points# + str(int(time.time() * 1000))
+        #    text=str(proc)+'% ' + points + '\n'+str(api.get_progress()['eta_relative']) + '\n'+str(api.get_progress()['state'])
+        #)
+        #await bot.send_message(
+        #    chat_id=msgTime.chat.id,
+        #    text='проверка'
+        #)
+        #image = base64.b64decode(api.get_progress()['current_image'])
+        #image_buffer = io.BytesIO()
+        #image.save(image_buffer, format="PNG")
+        #image_buffer.seek(0)
+        #img = Image.open(image_buffer)
+        #width, height = img.size
+        #ratio = min(256 / width, 256 / height)
+        #new_size = (round(width * ratio), round(height * ratio))
+        #img = img.resize(new_size)
+        #img_byte_arr = io.BytesIO()
+        #img.save(img_byte_arr, format="PNG")
+        #img_byte_arr.seek(0)
+        #image_data = base64.b64decode(api.get_progress()['current_image'])
+        #input_file = InputFile(image_data, filename="image.png")
+        #input_media = InputMediaPhoto(input_file)
+        #await bot.edit_message_media(chat_id=msgTime.chat.id, message_id=msgTime.message_id, media=input_media,
+        #                             text=str(proc)+'% ' + points + '\n'+str(api.get_progress()['eta_relative']) + '\n'+str(api.get_progress()['state'])
+        #                             )
+        #await bot.send_media_group(
+        #    chat_id=msgTime.chat.id, media=pilToImages(api.get_progress()['current_image'], "thumbs")
+        #)
 
+        #img_base64 = "iVBORw0KGgoAAAANSUhEUgAAAlgAAAAmAhAAAADZI+25AAAClklEQVR4nO3UwQ2AMAADwMu33Hr/gWCFnltl9Ydu0v+PiH47qajzqajvOmrx7qssxDT48mi1lKCTpSEwRWhIKgbDBA9ABViSKgMBUxSIoAAD+CvP/Z6f14klgADwRv/vKd+zXZBIg2Azgv+5fjvTtT/ran2MJS5dSVTzxg/gkAF/nXUOLj2T539nCZcLDWsAYAAAAASUVORK5CYII="
+        media_group = []
+        image_base64 = api.get_progress()['current_image']
+        image = base64.b64decode(image_base64)
+        image_buffer = io.BytesIO(image)
+        img = Image.open(image_buffer)
+        img.save(image_buffer, format="PNG")
+        image_buffer.seek(0)
+        #media_group.append(types.InputMediaPhoto(media=image_buffer.getvalue(), caption='1121'))
+        #await bot.send_media_group(chat_id=msgTime.chat.id, media=media_group)
+
+        # Сохраняем изображение на диск
+        img_path = 'image.png'
+        with open(img_path, 'wb') as f:
+            f.write(image)
+
+        # Открываем изображение в виде InputFile
+        media_group.append(types.InputMediaPhoto(img_path, caption='1121'))
+        os.remove(img_path)
+
+        # Отправляем медиа-группу
+        await bot.send_media_group(chat_id=msgTime.chat.id, media=media_group)
 # -------- MENU ----------
 # Стартовое меню
 def getKeyboard(keysArr, returnAll):
@@ -221,7 +285,7 @@ async def getKeyboardUnion(txt, message, keyboard, parse_mode = 'Markdown'):
             parse_mode=parse_mode
         )
 
-def getStart(returnAll=1) -> InlineKeyboardMarkup:
+def getStart(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton(sd + "sd",  callback_data="sd"),
         InlineKeyboardButton("opt",      callback_data="opt"),
@@ -232,7 +296,7 @@ def getStart(returnAll=1) -> InlineKeyboardMarkup:
     return (getKeyboard(keysArr, returnAll))
 
 # Меню опций
-def getOpt(returnAll=1) -> InlineKeyboardMarkup:
+def getOpt(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("sttngs",  callback_data="sttngs"),
         InlineKeyboardButton("scrpts",  callback_data="scrpts"),
@@ -245,7 +309,7 @@ def getOpt(returnAll=1) -> InlineKeyboardMarkup:
 
 
 # Меню скриптов
-def getScripts(returnAll=1) -> InlineKeyboardMarkup:
+def getScripts(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("get_lora", callback_data="get_lora"),
         InlineKeyboardButton("rnd_mdl",  callback_data="rnd_mdl"),
@@ -255,15 +319,23 @@ def getScripts(returnAll=1) -> InlineKeyboardMarkup:
 
 
 # Меню настроек
-def getSet(returnAll=1) -> InlineKeyboardMarkup:
+def getSet(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("change_param", callback_data="change_param"),
         InlineKeyboardButton("reset_param",  callback_data="reset_param"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
+# Меню галочек Да/Нет
+def getYesNo(returnAll = 1, nam = '') -> InlineKeyboardMarkup:
+    keysArr = [
+        InlineKeyboardButton("✅", callback_data="✅"+nam),
+        InlineKeyboardButton("❌", callback_data="❌"+nam)
+    ]
+    return (getKeyboard(keysArr, returnAll))
+
 # Меню промпта
-def getPrompt(returnAll=1) -> InlineKeyboardMarkup:
+def getPrompt(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [InlineKeyboardButton("random_prompt", callback_data="random_prompt"),
                InlineKeyboardButton("lxc_prompt", callback_data="lxc_prompt"),]
     return (getKeyboard(keysArr, returnAll))
@@ -437,6 +509,8 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
     print("inl_reset_param")
     global data
     global dataParams
+    global dataOld
+    global dataOldParams
     data = dataOld
     dataParams = dataOldParams
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
@@ -471,36 +545,41 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         chatId = message.chat.id
     else:
         chatId = message.message.chat.id
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
-    msgTime = await bot.send_message(
-        chat_id=chatId,
-        text='Начали'
-    )
-    # Включаем асинхрон, чтоб заработал await api.txt2img
-    data["use_async"] = "True"
-    asyncio.create_task(getProgress(msgTime))
-    # TODO try catch if wrong data
-    res = await api.txt2img(**data)
-    if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-        await bot.send_media_group(
-            chat_id=chatId, media=pilToImages(res, "thumbs")
+    global sd
+    if sd == '✅':
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
+        msgTime = await bot.send_message(
+            chat_id=chatId,
+            text='Начали'
         )
-    if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-        await bot.send_media_group(
-            chat_id=chatId, media=pilToImages(res, "tg")
+        # Включаем асинхрон, чтоб заработал await api.txt2img
+        data["use_async"] = "True"
+        asyncio.create_task(getProgress(msgTime))
+        # TODO try catch if wrong data
+        res = await api.txt2img(**data)
+        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "thumbs")
+            )
+        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "tg")
+            )
+        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "real")
+            )
+        await bot.send_message(
+            chat_id=chatId,
+            text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
+            reply_markup=keyboard,
+            parse_mode="Markdown",
         )
-    if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-        await bot.send_media_group(
-            chat_id=chatId, media=pilToImages(res, "real")
-        )
-    await bot.send_message(
-        chat_id=chatId,
-        text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
-        reply_markup=keyboard,
-        parse_mode="Markdown",
-    )
-    # Удаляем сообщение с прогрессом
-    await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+        # Удаляем сообщение с прогрессом
+        await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
+    else:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
+        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
 
 # Получить меню действий с промптами
 @dp.callback_query_handler(text="prompt")
@@ -687,6 +766,29 @@ async def inl_hrs(callback: types.CallbackQuery) -> None:
     menu.append(getStart(0))
     await getKeyboardUnion('Теперь hr_upscaler = ' + str(hrs), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
 
+# тыкнули на ✅ или ❌
+@dp.callback_query_handler(text_startswith="✅")
+@dp.callback_query_handler(text_startswith="❌")
+async def inl_yes_no(callback: types.CallbackQuery) -> None:
+    print('inl_yes_no')
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    if callback.data[:1] == "✅":
+        if callback.data[1:] in data.keys():
+            data[callback.data[1:]] = 'True'
+        if callback.data[1:] in dataParams.keys():
+            dataParams[callback.data[1:]] = 'True'
+    if callback.data[:1] == "❌":
+        if callback.data[1:] in data.keys():
+            data[callback.data[1:]] = 'False'
+        if callback.data[1:] in dataParams.keys():
+            dataParams[callback.data[1:]] = 'False'
+    await bot.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.message_id,
+        text=f"JSON параметры:\n{getJson()}\n{getJson(1)}",
+        reply_markup=keyboard,
+    )
+
 # Ввели любой текст
 @dp.message_handler(lambda message: True)
 async def change_json(message: types.Message):
@@ -699,11 +801,28 @@ async def change_json(message: types.Message):
     # Поиск команд из data
     if nam in state_names:
         if args == "":
-            await message.answer("Напиши любое " + nam)
-            if nam in state_names:
-                await getattr(Form, nam).set()
-            else:
-                print("Ошибка какая-то")
+            if nam in data.keys():
+                if str(data[nam]).lower() in ['true', 'false']:
+                    await message.answer(
+                        f"Выбирай значение для "+nam, reply_markup=getYesNo(1, nam)
+                    )
+                else:
+                    await message.answer("Напиши любое " + nam)
+                    if nam in state_names:
+                        await getattr(Form, nam).set()
+                    else:
+                        print("Ошибка какая-то")
+            if nam in dataParams.keys():
+                if str(dataParams[nam]).lower() in ['true', 'false']:
+                    await message.answer(
+                        f"Выбирай значение для "+nam, reply_markup=getYesNo(1, nam)
+                    )
+                else:
+                    await message.answer("Напиши любое " + nam)
+                    if nam in state_names:
+                        await getattr(Form, nam).set()
+                    else:
+                        print("Ошибка какая-то")
         else:
             # /txt 321 пишем 321 в data['txt']
             data[nam] = args

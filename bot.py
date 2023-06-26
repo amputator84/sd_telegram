@@ -175,6 +175,19 @@ def rnd_prmt_lxc():
     txt = random.choice(submit_get('https://lexica.art/api/v1/search?q='+data['prompt'], '').json()['images'])['prompt']
     return txt
 
+# get settings. TODO - cut 4000 symbols
+def get_prompt_settings():
+    prompt = data['prompt']
+    cfg_scale = data['cfg_scale']
+    width = data['width']
+    height = data['height']
+    steps = data['steps']
+    negative_prompt = data['negative_prompt']
+    sampler_name = data['sampler_name']
+    sd_model_checkpoint = api.get_options()['sd_model_checkpoint']
+    txt = f"prompt = <code>{prompt}</code>\nsteps = {steps} \ncfg_scale = {cfg_scale} \nwidth = {width} \nheight = {height} \nsampler_name = {sampler_name} \nsd_model_checkpoint = {sd_model_checkpoint} \nnegative_prompt = <code>{negative_prompt}</code> "
+    return txt
+
 # Translate
 def translateRuToEng(text):
     translator = Translator(from_lang="ru", to_lang="en")
@@ -336,8 +349,9 @@ def getYesNo(returnAll = 1, nam = '') -> InlineKeyboardMarkup:
 
 # Меню промпта
 def getPrompt(returnAll = 1) -> InlineKeyboardMarkup:
-    keysArr = [InlineKeyboardButton("random_prompt", callback_data="random_prompt"),
-               InlineKeyboardButton("lxc_prompt", callback_data="lxc_prompt"),]
+    keysArr = [InlineKeyboardButton("get",           callback_data="get"),
+               InlineKeyboardButton("random_prompt", callback_data="random_prompt"),
+               InlineKeyboardButton("lxc_prompt",    callback_data="lxc_prompt"),]
     return (getKeyboard(keysArr, returnAll))
 
 # Меню текста
@@ -725,6 +739,14 @@ async def get_lxc_prompt(message: Union[types.Message, types.CallbackQuery]) -> 
 async def random_prompt(callback: types.CallbackQuery) -> None:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
     await getKeyboardUnion(get_random_prompt(), callback, keyboard)
+
+@dp.callback_query_handler(text="get")
+async def get_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
+    if sd == '✅':
+        await getKeyboardUnion(get_prompt_settings(), message, keyboard, types.ParseMode.HTML)
+    else:
+        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
 
 # тыкнули на модельку
 @dp.callback_query_handler(text_startswith="models")

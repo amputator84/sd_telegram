@@ -38,10 +38,12 @@ change sampler from list
 __**hr**  
 change hr_upscale from list  
 __**prompt**  
+___**get**  
+get settings in string  
 ___**random_prompt**  
 get random prompt from GPT2Tokenizer FredZhang7 distilgpt2    
 ___**lxc_prompt**  
-get random prompt from lexica.art  
+get random prompt from lexica.art (+ your prompt begin)  
 _**gen**  
 generate images  
 _**skip**  
@@ -64,6 +66,7 @@ help
 9. Ability to send everything with one command with settings
 10. Preloading photos when waiting for a long time so that you can skip
 11. Uploading random.json from export TG channel
+12. Progress in script
 
 **TNX**  
 [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui)  

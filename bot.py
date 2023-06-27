@@ -576,7 +576,19 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         asyncio.create_task(getProgress(msgTime))
         # TODO try catch if wrong data
         res = await api.txt2img(**data)
-        await show_thumbs(chatId, res)
+        # show_thumbs dont work because use_async
+        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "thumbs")
+            )
+        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "tg")
+            )
+        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+            await bot.send_media_group(
+                chat_id=chatId, media=pilToImages(res, "real")
+            )
         await bot.send_message(
             chat_id=chatId,
             text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
@@ -755,7 +767,6 @@ async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> Non
         data['sampler_name'] = samplers[num_smp]['name']  # Ý
 
         data["use_async"] = False
-        #data["enable_hr"] = True
         # GEN
         res = api.txt2img(**data)
         await show_thumbs(chatId, res)

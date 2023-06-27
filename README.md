@@ -31,6 +31,8 @@ ___**rnd_mdl**
 script for generating images for **all** models in **random** order, taking into account JSON settings  
 ___**rnd_smp**  
 script for generating images for one models with all samplers  
+___**inf**  
+Endless script with random width, height, scale, model, sampler, steps, prompt(1. random-word-api.herokuapp.com/word?lang=en, 2.GPT2Tokenizer, 3. lexica.art/api/v1/search?q=2, 4 = 2 + 3)  
 __**mdl**  
 change model from list  
 __**smplr**  

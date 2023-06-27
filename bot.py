@@ -327,6 +327,7 @@ def getScripts(returnAll = 1) -> InlineKeyboardMarkup:
         InlineKeyboardButton("get_lora", callback_data="get_lora"),
         InlineKeyboardButton("rnd_mdl",  callback_data="rnd_mdl"),
         InlineKeyboardButton("rnd_smp",  callback_data="rnd_smp"),
+        InlineKeyboardButton("inf",      callback_data="inf"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -422,18 +423,7 @@ async def rnd_script(message, typeScript):
             data['sampler_name'] = elements[number]['name']  # Ý
         data["use_async"] = False
         res = api.txt2img(**data)
-        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "thumbs")
-            )
-        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "tg")
-            )
-        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "real")
-            )
+        await show_thumbs(chatId, res)
         await bot.send_message(
             chat_id=chatId,
             text=elements[number] if typeScript == 'models' else elements[number]['name']
@@ -449,6 +439,21 @@ async def rnd_script(message, typeScript):
         ,
         reply_markup=keyboard
     )
+
+# show thumb/tg/real
+async def show_thumbs(chat_id, res):
+    if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+        await bot.send_media_group(
+            chat_id=chat_id, media=pilToImages(res, "thumbs")
+        )
+    if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+        await bot.send_media_group(
+            chat_id=chat_id, media=pilToImages(res, "tg")
+        )
+    if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+        await bot.send_media_group(
+            chat_id=chat_id, media=pilToImages(res, "real")
+        )
 
 # -------- COMMANDS ----------
 
@@ -571,18 +576,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         asyncio.create_task(getProgress(msgTime))
         # TODO try catch if wrong data
         res = await api.txt2img(**data)
-        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "thumbs")
-            )
-        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "tg")
-            )
-        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "real")
-            )
+        await show_thumbs(chatId, res)
         await bot.send_message(
             chat_id=chatId,
             text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
@@ -701,6 +695,75 @@ async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> Non
     print('inl_rnd_smp')
     await rnd_script(message, 'samplers')
 
+# script random infinity gen from https://random-word-api.herokuapp.com/word?lang=en
+@dp.message_handler(commands=["inf"])
+@dp.callback_query_handler(text='inf')
+async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print('inl_rnd_inf')
+    if hasattr(message, "content_type"):
+        chatId = message.chat.id
+    else:
+        chatId = message.message.chat.id
+    while True:
+        time.sleep(2)
+        # PROMPT
+        t = requests.get('https://random-word-api.herokuapp.com/word?lang=en').text
+        text = json.loads(t)[0]  # data["prompt"]  # from JSON
+        tokenizer = GPT2Tokenizer.from_pretrained("distilgpt2")
+        tokenizer.add_special_tokens({"pad_token": "[PAD]"})
+        model = GPT2LMHeadModel.from_pretrained("FredZhang7/distilgpt2-stable-diffusion-v2")
+        input_ids = tokenizer(text, return_tensors="pt").input_ids
+        txt = model.generate(
+            input_ids,
+            do_sample=True,
+            temperature=0.7,
+            top_k=4,
+            max_length=20,
+            num_return_sequences=1,
+            repetition_penalty=1.2,
+            penalty_alpha=0.5,
+            no_repeat_ngram_size=0,
+            early_stopping=True,
+        )
+        prompt = tokenizer.decode(txt[0], skip_special_tokens=True)
+        prompt_lxc = random.choice(submit_get('https://lexica.art/api/v1/search?q=' + prompt, '').json()['images'])['prompt']
+        data['prompt'] = prompt + ', ' + prompt_lxc
+        # SCALE
+        data['cfg_scale'] = round(random.uniform(4.7, 15), 1)
+        # STEPS
+        data['steps'] = round(random.uniform(10, 80))
+        # WIDTH and HEIGHT
+        width = random.randrange(512, 1601, 64)
+        height = random.randrange(512, 1601, 64)
+
+        while width * height > 1000000:
+            width = random.randrange(512, 1601, 64)
+            height = random.randrange(512, 1601, 64)
+        data['width'] = width
+        data['height'] = height
+        # MODEL
+        models = api.util_get_model_names()
+        num_mdl = random.randint(0, len(models) - 1)
+        api.util_wait_for_ready()
+        api.util_set_model(models[num_mdl])
+        # SAMPLER
+        samplers = api.get_samplers()
+        num_smp = random.randint(0, len(samplers) - 1)
+        options = {}
+        options['sampler_name'] = samplers[num_smp]['name']
+        api.set_options(options)
+        data['sampler_name'] = samplers[num_smp]['name']  # Ý
+
+        data["use_async"] = False
+        #data["enable_hr"] = True
+        # GEN
+        res = api.txt2img(**data)
+        await show_thumbs(chatId, res)
+        await bot.send_message(
+            chat_id=chatId,
+            text=get_prompt_settings(),
+            parse_mode = types.ParseMode.HTML
+        )
 
 # Получить LORA
 @dp.message_handler(commands=["get_lora"])

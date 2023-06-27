@@ -909,7 +909,12 @@ async def change_json(message: types.Message):
                         print("Ошибка какая-то")
         else:
             # /txt 321 пишем 321 в data['txt']
-            data[nam] = args
+            # Ý 0,1 into 0.1
+            newArgs = args
+            if str(args[1:2]) == ",":
+                newArgs = args.replace(',','.')
+            data[nam] = newArgs
+            print(args)
             # TODO answer поменять на edit_text
             await message.answer(
                 f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
@@ -934,7 +939,10 @@ async def answer_handler(message: types.Message, state: FSMContext):
             break
     for key, val in data.items():
         if current_state == "Form:" + key:
-            data[key] = txt
+            newTxt = txt
+            if str(txt[1:2]) == ",":
+                newTxt = txt.replace(',','.')
+            data[key] = newTxt
             break
     await state.reset_state()
     await message.answer(

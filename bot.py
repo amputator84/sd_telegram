@@ -88,7 +88,7 @@ def start_sd():
     global process, sd
     if not process:
         print('start_process start_sd')
-        process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers"])
+        process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers", "--disable-nan-check"])
         sd = "✅"
 
 async def stop_sd():
@@ -339,6 +339,7 @@ def getSet(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("change_param", callback_data="change_param"),
         InlineKeyboardButton("reset_param",  callback_data="reset_param"),
+        InlineKeyboardButton("fast_param",  callback_data="fast_param"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -536,6 +537,34 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
     global dataOldParams
     data = dataOld
     dataParams = dataOldParams
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
+    txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
+    await getKeyboardUnion(txt, message, keyboard, '')
+
+# Вызов fast_param, быстрые настройки
+@dp.message_handler(commands=["fast_param"])
+@dp.callback_query_handler(text="fast_param")
+async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_fast_param")
+    global data
+    global dataParams
+    data['steps'] = 35
+    data['sampler_name'] = 'Euler a'
+    data['enable_hr'] = 'True'
+    data['denoising_strength'] = '0.5'
+    data['hr_upscaler'] = 'ESRGAN_4x'
+    data['hr_second_pass_steps'] = '10'
+    data['cfg_scale'] = '8'
+    data['width'] = '512'
+    data['height'] = '768'
+    data['restore_faces'] = 'true'
+    data['do_not_save_grid'] = 'true'
+    data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
+    data['save_images'] = 'true'
+    dataParams = {"img_thumb": "true",
+                  "img_tg": "false",
+                  "img_real": "true",
+                  "stop_sd": "true"}
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard, '')
@@ -866,6 +895,7 @@ async def inl_yes_no(callback: types.CallbackQuery) -> None:
             data[callback.data[1:]] = 'False'
         if callback.data[1:] in dataParams.keys():
             dataParams[callback.data[1:]] = 'False'
+    #await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
     await bot.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.message_id,
@@ -890,8 +920,9 @@ async def change_json(message: types.Message):
                     await message.answer(
                         f"Выбирай значение для "+nam, reply_markup=getYesNo(1, nam)
                     )
+                    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
                 else:
-                    await message.answer("Напиши любое " + nam)
+                    await message.answer("Напиши любое " + nam + ', сейчас оно = ' + str(data[nam]))
                     if nam in state_names:
                         await getattr(Form, nam).set()
                     else:
@@ -901,8 +932,10 @@ async def change_json(message: types.Message):
                     await message.answer(
                         f"Выбирай значение для "+nam, reply_markup=getYesNo(1, nam)
                     )
+                    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
                 else:
-                    await message.answer("Напиши любое " + nam)
+                    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+                    await message.answer("Напиши любое " + nam + ', сейчас оно = ' + str(data[nam]))
                     if nam in state_names:
                         await getattr(Form, nam).set()
                     else:
@@ -916,11 +949,13 @@ async def change_json(message: types.Message):
             data[nam] = newArgs
             print(args)
             # TODO answer поменять на edit_text
+            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
             await message.answer(
                 f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
             )
     else:
         data["prompt"] = message.text
+        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         await message.answer(
             f"Записали промпт. JSON параметры:\n{getJson()}\n{getJson(1)}",
             reply_markup=keyboard,
@@ -945,6 +980,7 @@ async def answer_handler(message: types.Message, state: FSMContext):
             data[key] = newTxt
             break
     await state.reset_state()
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
     await message.answer(
         f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
     )

@@ -64,7 +64,8 @@ data['sampler_name'] = 'Euler a'
 dataParams = {"img_thumb": "true",
               "img_tg": "true",
               "img_real": "true",
-              "stop_sd": "true"}
+              "stop_sd": "true",
+              "use_prompt": "true"}
 dataOld = data.copy()
 dataOldParams = dataParams.copy()
 dataOrig = data.copy()
@@ -410,30 +411,34 @@ async def rnd_script(message, typeScript):
         elements = api.get_samplers()
     numbers = list(range(len(elements)))
     random.shuffle(numbers)
+    dataPromptOld = data['prompt']
     await bot.send_message(
         chat_id=chatId,
-        text='Цикл по '+str(len(elements)) + (' моделям' if typeScript == 'models' else ' семплерам')
+        text='Цикл по '+str(len(elements)) + (' моделям' if typeScript == 'models' else ' семплерам') + ', ' + dataPromptOld
     )
-
     for i, number in enumerate(numbers):
-        if typeScript == 'models':
-            api.util_wait_for_ready()
-            api.util_set_model(elements[number])
-        else:
-            options = {}
-            options['sampler_name'] = elements[number]['name']
-            api.set_options(options)
-            data['sampler_name'] = elements[number]['name']  # Ý
-        data["use_async"] = False
-        res = api.txt2img(**data)
-        await show_thumbs(chatId, res)
-        await bot.send_message(
-            chat_id=chatId,
-            text=elements[number] if typeScript == 'models' else elements[number]['name']
-        )
+        time.sleep(2)
+        for itemTxt in data['prompt'].split(';'):
+            if typeScript == 'models':
+                api.util_wait_for_ready()
+                api.util_set_model(elements[number])
+            else:
+                options = {}
+                options['sampler_name'] = elements[number]['name']
+                api.set_options(options)
+                data['sampler_name'] = elements[number]['name']  # Ý
+            data["use_async"] = "False"
+            data['prompt'] = itemTxt
+            res = await api.txt2img(**data)
+            await show_thumbs(chatId, res)
+            await bot.send_message(
+                chat_id=chatId,
+                text=elements[number] if typeScript == 'models' else elements[number]['name']
+            )
+    data['prompt'] = dataPromptOld
     await bot.send_message(
         chat_id=chatId,
-        text="Готово \n"+str(data['prompt']) +
+        text="Готово \n"+str(dataPromptOld) +
                     "\n cfg_scale = " + str(data['cfg_scale']) +
                     "\n width = " + str(data['width']) +
                     "\n height = " + str(data['height']) +
@@ -598,38 +603,45 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
     else:
         chatId = message.message.chat.id
     global sd
+    dataPromptOld = data['prompt']
     if sd == '✅':
+        for itemTxt in data['prompt'].split(';'):
+            msgTime = await bot.send_message(
+                chat_id=chatId,
+                text='Начали'
+            )
+            # Включаем асинхрон, чтоб заработал await api.txt2img
+            data["use_async"] = "True"
+            data["prompt"] = itemTxt # только для **data
+            asyncio.create_task(getProgress(msgTime))
+            # TODO try catch if wrong data
+            res = await api.txt2img(**data)
+            # show_thumbs dont work because use_async
+            if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
+                await bot.send_media_group(
+                    chat_id=chatId, media=pilToImages(res, "thumbs")
+                )
+            if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
+                await bot.send_media_group(
+                    chat_id=chatId, media=pilToImages(res, "tg")
+                )
+            if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
+                await bot.send_media_group(
+                    chat_id=chatId, media=pilToImages(res, "real")
+                )
+            await bot.send_message(
+                chat_id=chatId,
+                text=data["prompt"] + "\n" + str(res.info["all_seeds"])
+            )
+            # Удаляем сообщение с прогрессом
+            await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
         keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
-        msgTime = await bot.send_message(
-            chat_id=chatId,
-            text='Начали'
-        )
-        # Включаем асинхрон, чтоб заработал await api.txt2img
-        data["use_async"] = "True"
-        asyncio.create_task(getProgress(msgTime))
-        # TODO try catch if wrong data
-        res = await api.txt2img(**data)
-        # show_thumbs dont work because use_async
-        if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "thumbs")
-            )
-        if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "tg")
-            )
-        if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "real")
-            )
         await bot.send_message(
             chat_id=chatId,
-            text=data["prompt"] + "\n" + str(res.info["all_seeds"]),
+            text=f"`{dataPromptOld}`",
             reply_markup=keyboard,
             parse_mode="Markdown",
         )
-        # Удаляем сообщение с прогрессом
-        await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
     else:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
         await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
@@ -732,13 +744,51 @@ async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> Non
     print('inl_rnd_mdl')
     await rnd_script(message, 'models')
 
-
 # script random gen from models
 @dp.message_handler(commands=["rnd_smp"])
 @dp.callback_query_handler(text='rnd_smp')
 async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> None:
     print('inl_rnd_smp')
     await rnd_script(message, 'samplers')
+
+# inf function
+async def inf_func(chatId):
+    print('inf_func')
+    # SCALE
+    data['cfg_scale'] = round(random.uniform(4.7, 15), 1)
+    # STEPS
+    data['steps'] = round(random.uniform(10, 80))
+    # WIDTH and HEIGHT
+    width = random.randrange(512, 1601, 64)
+    height = random.randrange(512, 1601, 64)
+
+    while width * height > 1000000:
+        width = random.randrange(512, 1601, 64)
+        height = random.randrange(512, 1601, 64)
+    data['width'] = width
+    data['height'] = height
+    # MODEL
+    models = api.util_get_model_names()
+    num_mdl = random.randint(0, len(models) - 1)
+    api.util_wait_for_ready()
+    api.util_set_model(models[num_mdl])
+    # SAMPLER
+    samplers = api.get_samplers()
+    num_smp = random.randint(0, len(samplers) - 1)
+    options = {}
+    options['sampler_name'] = samplers[num_smp]['name']
+    api.set_options(options)
+    data['sampler_name'] = samplers[num_smp]['name']  # Ý
+
+    data["use_async"] = False
+    # GEN
+    res = api.txt2img(**data)
+    await show_thumbs(chatId, res)
+    await bot.send_message(
+        chat_id=chatId,
+        text=get_prompt_settings(),
+        parse_mode=types.ParseMode.HTML
+    )
 
 # script random infinity gen from https://random-word-api.herokuapp.com/word?lang=en
 @dp.message_handler(commands=["inf"])
@@ -749,49 +799,26 @@ async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> Non
         chatId = message.chat.id
     else:
         chatId = message.message.chat.id
-    while True:
-        time.sleep(2)
-        # PROMPT
-        t = requests.get('https://random-word-api.herokuapp.com/word?lang=en').text
-        text = json.loads(t)[0]  # data["prompt"]  # from JSON
-        prompt = get_random_prompt(text, 20)
-        prompt_lxc = random.choice(submit_get('https://lexica.art/api/v1/search?q=' + prompt, '').json()['images'])['prompt']
-        data['prompt'] = prompt + ', ' + prompt_lxc
-        # SCALE
-        data['cfg_scale'] = round(random.uniform(4.7, 15), 1)
-        # STEPS
-        data['steps'] = round(random.uniform(10, 80))
-        # WIDTH and HEIGHT
-        width = random.randrange(512, 1601, 64)
-        height = random.randrange(512, 1601, 64)
-
-        while width * height > 1000000:
-            width = random.randrange(512, 1601, 64)
-            height = random.randrange(512, 1601, 64)
-        data['width'] = width
-        data['height'] = height
-        # MODEL
-        models = api.util_get_model_names()
-        num_mdl = random.randint(0, len(models) - 1)
-        api.util_wait_for_ready()
-        api.util_set_model(models[num_mdl])
-        # SAMPLER
-        samplers = api.get_samplers()
-        num_smp = random.randint(0, len(samplers) - 1)
-        options = {}
-        options['sampler_name'] = samplers[num_smp]['name']
-        api.set_options(options)
-        data['sampler_name'] = samplers[num_smp]['name']  # Ý
-
-        data["use_async"] = False
-        # GEN
-        res = api.txt2img(**data)
-        await show_thumbs(chatId, res)
+    if str(dataParams['use_prompt']).lower() == 'true':
         await bot.send_message(
             chat_id=chatId,
-            text=get_prompt_settings(),
-            parse_mode = types.ParseMode.HTML
+            text='use_prompt включен, будет использоваться промпт ' + data['prompt']
         )
+    while True:
+        # PROMPT
+        if str(dataParams['use_prompt']).lower() == 'false':
+            t = requests.get('https://random-word-api.herokuapp.com/word?lang=en').text
+            text = json.loads(t)[0]  # data["prompt"]  # from JSON
+            prompt = get_random_prompt(text, 20)
+            prompt_lxc = random.choice(submit_get('https://lexica.art/api/v1/search?q=' + prompt, '').json()['images'])['prompt']
+            data['prompt'] = prompt + ', ' + prompt_lxc
+            await inf_func(chatId)
+        else:
+            dataPromptOld = data['prompt']
+            for itemTxt in data['prompt'].split(';'):
+                data['prompt'] = itemTxt
+                await inf_func(chatId)
+            data['prompt'] = dataPromptOld
 
 # Получить LORA
 @dp.message_handler(commands=["get_lora"])

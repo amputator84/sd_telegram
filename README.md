@@ -13,6 +13,8 @@ cd C:\stable-diffusion-webui\extensions\sd_telegram\
 python bot.py
 ``````
 
+use ; in prompt as delimiter to be divided into several separate parts, like ```cat;dog;car```
+
 Commands  
 **start**  
 _**SD**  
@@ -24,6 +26,8 @@ change JSON parameters
 img_thumb/img_tg/img_real - little/original from tg/real size from doc  
 ___**reset_param**  
 reset to default  
+___**fast_param**  
+reset to my default params    
 __**scrpts**  
 ___**get_lora**  
 get list LORA`s from stable-diffusion-webui/models/Lora  

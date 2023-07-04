@@ -795,6 +795,7 @@ async def inf_func(chatId):
 @dp.callback_query_handler(text='inf')
 async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> None:
     print('inl_rnd_inf')
+    global dataParams # ?
     if hasattr(message, "content_type"):
         chatId = message.chat.id
     else:
@@ -934,7 +935,7 @@ async def inl_yes_no(callback: types.CallbackQuery) -> None:
 @dp.message_handler(lambda message: True)
 async def change_json(message: types.Message):
     print("change_json")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     text = message.text
     nam = text.split()[0][1:]  # txt из /txt 321
     state_names = [attr for attr in dir(Form) if isinstance(getattr(Form, attr), State)]
@@ -992,7 +993,7 @@ async def change_json(message: types.Message):
 @dp.message_handler(state=Form)
 async def answer_handler(message: types.Message, state: FSMContext):
     print('answer_handler')
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     current_state = await state.get_state()  # Form:команда
     txt = message.text
     for key, val in dataParams.items():

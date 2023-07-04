@@ -328,6 +328,7 @@ def getOpt(returnAll = 1) -> InlineKeyboardMarkup:
 def getScripts(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("get_lora", callback_data="get_lora"),
+        #InlineKeyboardButton("upload",   callback_data="upload"),
         InlineKeyboardButton("rnd_mdl",  callback_data="rnd_mdl"),
         InlineKeyboardButton("rnd_smp",  callback_data="rnd_smp"),
         InlineKeyboardButton("inf",      callback_data="inf"),
@@ -340,7 +341,15 @@ def getSet(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("change_param", callback_data="change_param"),
         InlineKeyboardButton("reset_param",  callback_data="reset_param"),
-        InlineKeyboardButton("fast_param",  callback_data="fast_param"),
+        InlineKeyboardButton("fast_param",   callback_data="fast_param"),
+    ]
+    return (getKeyboard(keysArr, returnAll))
+
+# Меню загрузки
+def getUpl(returnAll = 1) -> InlineKeyboardMarkup:
+    keysArr = [
+        InlineKeyboardButton("uplora",   callback_data="uplora"),
+        InlineKeyboardButton("uplmodel", callback_data="uplmodel"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -532,6 +541,26 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
             )
 
 # Вызов reset_param, сброс JSON
+@dp.message_handler(commands=["upload"])
+@dp.callback_query_handler(text="upload")
+async def inl_upload(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_upload")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getUpl(0), getSet(0), getOpt(0), getStart(0)])
+    await message.answer(
+        "Грузим LORA или Model?", reply_markup=keyboard
+    )
+
+# upload Lora
+@dp.message_handler(commands=["uplora"])
+@dp.callback_query_handler(text="uplora")
+async def inl_uplora(message: Union[types.Message, types.CallbackQuery]) -> None:
+    print("inl_uplora")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getUpl(0), getSet(0), getOpt(0), getStart(0)])
+    await message.answer(
+        "Вставьте LORA файлом", reply_markup=keyboard
+    )
+
+# Вызов reset_param, сброс JSON
 @dp.message_handler(commands=["reset_param"])
 @dp.callback_query_handler(text="reset_param")
 async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) -> None:
@@ -569,7 +598,8 @@ async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> 
     dataParams = {"img_thumb": "true",
                   "img_tg": "false",
                   "img_real": "true",
-                  "stop_sd": "true"}
+                  "stop_sd": "true",
+                  "use_prompt": "true"}
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard, '')

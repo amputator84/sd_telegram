@@ -32,6 +32,7 @@ import base64
 
 # from https://t.me/BotFather
 API_TOKEN = "TOKEN_HERE"
+API_TOKEN = "900510503:AAG5Xug_JEERhKlf7dpOpzxXcJIzlTbWX1M"
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -182,12 +183,12 @@ def rnd_prmt_lxc():
 # get settings. TODO - cut 4000 symbols
 def get_prompt_settings():
     global sd
-    prompt = data['prompt']
+    prompt = data['prompt'].replace('<', '&lt;').replace('>', '&gt;')
     cfg_scale = data['cfg_scale']
     width = data['width']
     height = data['height']
     steps = data['steps']
-    negative_prompt = data['negative_prompt']
+    negative_prompt = data['negative_prompt'].replace('<', '&lt;').replace('>', '&gt;')
     sampler_name = data['sampler_name']
     if sd == '❌':
         sd_model_checkpoint = dataParams['sd_model_checkpoint']
@@ -723,7 +724,7 @@ async def inl_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
         menu = get_models()
         menu.append(getOpt(0))
         menu.append(getStart(0))
-        await getKeyboardUnion("Скрипты", message, InlineKeyboardMarkup(inline_keyboard=menu))
+        await getKeyboardUnion("Модельки", message, InlineKeyboardMarkup(inline_keyboard=menu))
     else:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
         await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
@@ -905,13 +906,13 @@ async def get_prompt(message: Union[types.Message, types.CallbackQuery]) -> None
 @dp.callback_query_handler(text_startswith="models")
 async def inl_models(callback: types.CallbackQuery) -> None:
     print('inl_models')
+    menu = get_models()
+    menu.append(getOpt(0))
+    menu.append(getStart(0))
     mdl = callback.data.split("|")[1]
     dataParams['sd_model_checkpoint'] = mdl
     api.util_set_model(mdl)
     api.util_wait_for_ready()
-    menu = get_models()
-    menu.append(getOpt(0))
-    menu.append(getStart(0))
     await getKeyboardUnion('Теперь модель = ' + str(mdl), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
 
 # тыкнули на сэмплер

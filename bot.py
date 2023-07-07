@@ -65,6 +65,7 @@ dataParams = {"img_thumb": "true",
               "img_tg": "true",
               "img_real": "true",
               "stop_sd": "true",
+              "sd_model_checkpoint": "",
               "use_prompt": "true"}
 dataOld = data.copy()
 dataOldParams = dataParams.copy()
@@ -180,6 +181,7 @@ def rnd_prmt_lxc():
 
 # get settings. TODO - cut 4000 symbols
 def get_prompt_settings():
+    global sd
     prompt = data['prompt']
     cfg_scale = data['cfg_scale']
     width = data['width']
@@ -187,7 +189,10 @@ def get_prompt_settings():
     steps = data['steps']
     negative_prompt = data['negative_prompt']
     sampler_name = data['sampler_name']
-    sd_model_checkpoint = api.get_options()['sd_model_checkpoint']
+    if sd == '❌':
+        sd_model_checkpoint = dataParams['sd_model_checkpoint']
+    else:
+        sd_model_checkpoint = api.get_options()['sd_model_checkpoint']
     txt = f"prompt = <code>{prompt}</code>\nsteps = {steps} \ncfg_scale = {cfg_scale} \nwidth = {width} \nheight = {height} \nsampler_name = {sampler_name} \nsd_model_checkpoint = {sd_model_checkpoint} \nnegative_prompt = <code>{negative_prompt}</code> "
     return txt
 
@@ -430,6 +435,7 @@ async def rnd_script(message, typeScript):
         for itemTxt in data['prompt'].split(';'):
             if typeScript == 'models':
                 api.util_wait_for_ready()
+                dataParams['sd_model_checkpoint'] = elements[number]
                 api.util_set_model(elements[number])
             else:
                 options = {}
@@ -588,15 +594,15 @@ async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> 
     data['denoising_strength'] = '0.5'
     data['hr_upscaler'] = 'ESRGAN_4x'
     data['hr_second_pass_steps'] = '10'
-    data['cfg_scale'] = '8'
+    data['cfg_scale'] = '6'
     data['width'] = '512'
     data['height'] = '768'
     data['restore_faces'] = 'true'
     data['do_not_save_grid'] = 'true'
     data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
     data['save_images'] = 'true'
-    dataParams = {"img_thumb": "true",
-                  "img_tg": "false",
+    dataParams = {"img_thumb": "false",
+                  "img_tg": "true",
                   "img_real": "true",
                   "stop_sd": "true",
                   "use_prompt": "true"}
@@ -801,6 +807,7 @@ async def inf_func(chatId):
     models = api.util_get_model_names()
     num_mdl = random.randint(0, len(models) - 1)
     api.util_wait_for_ready()
+    dataParams['sd_model_checkpoint'] = models[num_mdl]
     api.util_set_model(models[num_mdl])
     # SAMPLER
     samplers = api.get_samplers()
@@ -892,16 +899,14 @@ async def random_prompt(callback: types.CallbackQuery) -> None:
 @dp.callback_query_handler(text="get")
 async def get_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
-    if sd == '✅':
-        await getKeyboardUnion(get_prompt_settings(), message, keyboard, types.ParseMode.HTML)
-    else:
-        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
+    await getKeyboardUnion(get_prompt_settings(), message, keyboard, types.ParseMode.HTML)
 
 # тыкнули на модельку
 @dp.callback_query_handler(text_startswith="models")
 async def inl_models(callback: types.CallbackQuery) -> None:
     print('inl_models')
     mdl = callback.data.split("|")[1]
+    dataParams['sd_model_checkpoint'] = mdl
     api.util_set_model(mdl)
     api.util_wait_for_ready()
     menu = get_models()

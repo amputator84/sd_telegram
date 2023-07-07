@@ -8,6 +8,7 @@ the bot is installed in automatic1111 via extensions or use _git clone_ into _C:
 ```
 pip install aiogram  
 pip install webuiapi  
+pip install translate  
 pip install transformers  
 cd C:\stable-diffusion-webui\extensions\sd_telegram\  
 python bot.py

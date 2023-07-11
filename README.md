@@ -58,22 +58,35 @@ skip one or all generations
 _**help**  
 help  
 
+If you send file, view 2 command:  
+_**uplora**  
+_**uplmodel**  
+
+Uploading files to folders:  
+\models\Stable-diffusion
+\models\Lora
+
+You upload a file to Telegram, choose what it is and the file automatically goes to the folder.
+A forwarded message with a file also works.
+
+Please pay attention to the file size limit in Telegram API:  
+[sending-files](https://core.telegram.org/bots/api#sending-files)  
+[senddocument](https://core.telegram.org/bots/api#senddocument)
+
+
 <img src="https://raw.githubusercontent.com/partyfind/sd_bot/master/trash/photo_2023-06-22_15-29-24.jpg" alt="drawing" width="400"/>
 <img src="https://raw.githubusercontent.com/partyfind/sd_bot/master/trash/photo_2023-06-22_15-29-27.jpg" width="350"/>
 
 **TODO**  
 1. use share link (not yet possible, because the API is running in the background)  
-2. uploading Lora from TG
-3. uploading models from TG (~4gb)
-4. Logging
-5. show error in tg
-6. translate
-7. Get all files/pictures from the computer for today (preview and seeds)
-8. Several prompts in one via ;
-9. Ability to send everything with one command with settings
-10. Preloading photos when waiting for a long time so that you can skip
-11. Uploading random.json from export TG channel
-12. Progress in script
+2. Logging
+3. show error in tg
+4. translate
+5. Get all files/pictures from the computer for today (preview and seeds)
+6. Ability to send everything with one command with settings
+7. Preloading photos when waiting for a long time so that you can skip
+8. Uploading random.json from export TG channel
+9. Progress in script
 
 **TNX**  
 [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui)  

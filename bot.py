@@ -29,10 +29,10 @@ from transformers import GPT2Tokenizer, GPT2LMHeadModel
 import inspect
 from translate import Translator
 import base64
+from pathlib import Path
 
 # from https://t.me/BotFather
 API_TOKEN = "TOKEN_HERE"
-API_TOKEN = "900510503:AAG5Xug_JEERhKlf7dpOpzxXcJIzlTbWX1M"
 
 bot = Bot(token=API_TOKEN)
 storage = MemoryStorage()
@@ -57,6 +57,7 @@ api = webuiapi.WebUIApi(host=host, port=port)
 local = "http://" + host + ":" + port
 process = None
 sd = "❌"
+doc = ''
 
 data = getAttrtxt2img()
 data['prompt'] = 'cat in space' # Ý
@@ -334,7 +335,6 @@ def getOpt(returnAll = 1) -> InlineKeyboardMarkup:
 def getScripts(returnAll = 1) -> InlineKeyboardMarkup:
     keysArr = [
         InlineKeyboardButton("get_lora", callback_data="get_lora"),
-        #InlineKeyboardButton("upload",   callback_data="upload"),
         InlineKeyboardButton("rnd_mdl",  callback_data="rnd_mdl"),
         InlineKeyboardButton("rnd_smp",  callback_data="rnd_smp"),
         InlineKeyboardButton("inf",      callback_data="inf"),
@@ -348,14 +348,6 @@ def getSet(returnAll = 1) -> InlineKeyboardMarkup:
         InlineKeyboardButton("change_param", callback_data="change_param"),
         InlineKeyboardButton("reset_param",  callback_data="reset_param"),
         InlineKeyboardButton("fast_param",   callback_data="fast_param"),
-    ]
-    return (getKeyboard(keysArr, returnAll))
-
-# Меню загрузки
-def getUpl(returnAll = 1) -> InlineKeyboardMarkup:
-    keysArr = [
-        InlineKeyboardButton("uplora",   callback_data="uplora"),
-        InlineKeyboardButton("uplmodel", callback_data="uplmodel"),
     ]
     return (getKeyboard(keysArr, returnAll))
 
@@ -432,7 +424,7 @@ async def rnd_script(message, typeScript):
         text='Цикл по '+str(len(elements)) + (' моделям' if typeScript == 'models' else ' семплерам') + ', ' + dataPromptOld
     )
     for i, number in enumerate(numbers):
-        time.sleep(2)
+        time.sleep(5)
         for itemTxt in data['prompt'].split(';'):
             if typeScript == 'models':
                 api.util_wait_for_ready()
@@ -547,25 +539,26 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
                 "SD запущена\n" + getTxt(), reply_markup=getStart()
             )
 
-# Вызов reset_param, сброс JSON
-@dp.message_handler(commands=["upload"])
-@dp.callback_query_handler(text="upload")
-async def inl_upload(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_upload")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getUpl(0), getSet(0), getOpt(0), getStart(0)])
-    await message.answer(
-        "Грузим LORA или Model?", reply_markup=keyboard
-    )
-
 # upload Lora
-@dp.message_handler(commands=["uplora"])
 @dp.callback_query_handler(text="uplora")
-async def inl_uplora(message: Union[types.Message, types.CallbackQuery]) -> None:
+@dp.callback_query_handler(text="uplmodel")
+async def inl_uplora(callback: types.CallbackQuery) -> None:
     print("inl_uplora")
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getUpl(0), getSet(0), getOpt(0), getStart(0)])
-    await message.answer(
-        "Вставьте LORA файлом", reply_markup=keyboard
-    )
+    global doc
+    if callback.data == 'uplora':
+        folder_path = Path('../../models/Lora')
+    else:
+        folder_path = Path('../../models/Stable-diffusion')
+    file_id = doc.file_id
+    file_name = doc.file_name
+    destination_path = os.path.join(folder_path, file_name)
+    file_path = folder_path / file_name
+    if file_path.exists():
+        await callback.message.reply(f"Файл '{file_name}' уже существует в {folder_path}")
+    else:
+        file_path = await bot.get_file(file_id)
+        await file_path.download(destination_path)
+        await callback.message.reply(f"Файл '{file_name}' загружен в {folder_path}")
 
 # Вызов reset_param, сброс JSON
 @dp.message_handler(commands=["reset_param"])
@@ -1049,6 +1042,18 @@ async def answer_handler(message: types.Message, state: FSMContext):
         f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
     )
 
+@dp.message_handler(content_types=['document'])
+async def handle_file(message: types.Message):
+    print('handle_file')
+    global doc
+    doc = message.document
+    keysArr = [InlineKeyboardButton("Lora",  callback_data="uplora"),
+               InlineKeyboardButton("Model", callback_data="uplmodel"),]
+    await bot.send_message(
+        chat_id=message.chat.id,
+        text="Что грузим?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[keysArr])
+    )
 
 # -------- BOT POLLING ----------
 if __name__ == "__main__":

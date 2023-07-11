@@ -67,6 +67,8 @@ local = "http://" + host + ":" + port
 process = None
 sd = "❌"
 doc = ''
+chatHistory = ''
+chatHistoryPrompt = ''
 
 data = getAttrtxt2img()
 data['prompt'] = 'cat in space' # Ý
@@ -100,14 +102,14 @@ Form = type("Form", (StatesGroup,), state_classes)
 def start_sd():
     global process, sd
     if not process:
-        print('start_process start_sd')
+        logging.info('start_process start_sd')
         process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers", "--disable-nan-check"])
         sd = "✅"
 
 async def stop_sd():
     global process, sd
     if process:
-        print('stop_process stop_sd')
+        logging.info('stop_process stop_sd')
         process.terminate()
         process = None
         sd = "❌"
@@ -221,7 +223,6 @@ def translateRuToEng(text):
 async def getProgress(msgTime):
     while True:
         # TODO aiogram.utils.exceptions.MessageToEditNotFound: Message to edit not found
-        await asyncio.sleep(1)
         proc = round(api.get_progress()['progress']*100)
         points = '.' * (proc % 9)
         await bot.edit_message_text(
@@ -229,6 +230,7 @@ async def getProgress(msgTime):
             message_id=msgTime.message_id,
             text=str(proc)+'% ' + points
         )
+        await asyncio.sleep(1)
 #TODO
 async def getProgress2(msgTime):
     points = '.'
@@ -375,9 +377,23 @@ def getYesNo(returnAll = 1, nam = '') -> InlineKeyboardMarkup:
 
 # Меню промпта
 def getPrompt(returnAll = 1) -> InlineKeyboardMarkup:
-    keysArr = [InlineKeyboardButton("get",           callback_data="get"),
-               InlineKeyboardButton("random_prompt", callback_data="random_prompt"),
-               InlineKeyboardButton("lxc_prompt",    callback_data="lxc_prompt"),]
+    global chatHistory
+
+    if chatHistory != '':
+        keysArr = [InlineKeyboardButton("get",    callback_data="get"),
+                   InlineKeyboardButton("random", callback_data="random_prompt"),
+                   InlineKeyboardButton("lxc",    callback_data="lxc_prompt"),
+                   InlineKeyboardButton("json",   callback_data="next")]
+    else:
+        keysArr = [InlineKeyboardButton("get",    callback_data="get"),
+                   InlineKeyboardButton("random", callback_data="random_prompt"),
+                   InlineKeyboardButton("lxc",    callback_data="lxc_prompt")]
+    return (getKeyboard(keysArr, returnAll))
+
+# Меню промпта из JSON
+def getPromptFromJson(returnAll = 1) -> InlineKeyboardMarkup:
+    keysArr = [InlineKeyboardButton("Next prompt", callback_data="next"),
+               InlineKeyboardButton("Save",        callback_data="save_prompt")]
     return (getKeyboard(keysArr, returnAll))
 
 # Меню текста
@@ -385,8 +401,7 @@ def getTxt():
     return "/start /opt /gen /skip /stop /help"
 
 def set_array(arrAll, itemArr, callback_data, useIn = 1):
-    print('set_array')
-    print(arrAll)
+    logging.info('set_array')
     arr = []
     arr2 = []
     i = 1
@@ -451,12 +466,18 @@ async def rnd_script(message, typeScript):
                 data['sampler_name'] = elements[number]['name']  # Ý
             data["use_async"] = "False"
             data['prompt'] = itemTxt
-            res = await api.txt2img(**data)
-            await show_thumbs(chatId, res)
-            await bot.send_message(
-                chat_id=chatId,
-                text=elements[number] if typeScript == 'models' else elements[number]['name']
-            )
+            try:
+                res = await api.txt2img(**data)
+                await show_thumbs(chatId, res)
+                await bot.send_message(
+                    chat_id=chatId,
+                    text=elements[number] if typeScript == 'models' else elements[number]['name']
+                )
+            except Exception as e:
+                await bot.send_message(
+                    chat_id=chatId,
+                    text=e
+                )
     data['prompt'] = dataPromptOld
     await bot.send_message(
         chat_id=chatId,
@@ -495,7 +516,6 @@ async def show_thumbs(chat_id, res):
 @dp.message_handler(commands=["start"])
 async def cmd_start(message: Union[types.Message, types.CallbackQuery]) -> None:
     logging.info("cmd_start")
-    #print("cmd_start")
     txt = "Это бот для локального запуска SD\n" + getTxt()
     await getKeyboardUnion(txt, message, getStart())
 
@@ -504,7 +524,7 @@ async def cmd_start(message: Union[types.Message, types.CallbackQuery]) -> None:
 @dp.message_handler(commands=["stop"])
 @dp.callback_query_handler(text="sd")
 async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_sd")
+    logging.info("inl_sd")
     global sd
     if hasattr(message, "content_type"):
         if message.text == '/stop':
@@ -540,25 +560,68 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
                     r = requests.get(url, timeout=3)
                     r.raise_for_status()
                     n = r.status_code
-                    print(r.status_code)
+                    logging.info(r.status_code)
                 except requests.exceptions.HTTPError as errh:
-                    print("Http Error:", errh)
+                    logging.info("Http Error:", errh)
                 except requests.exceptions.ConnectionError as errc:
-                    print("Error Connecting:", errc)
+                    logging.info("Error Connecting:", errc)
                 except requests.exceptions.Timeout as errt:
-                    print("Timeout Error:", errt)
+                    logging.info("Timeout Error:", errt)
                 except requests.exceptions.RequestException as err:
-                    print("OOps: Something Else", err)
+                    logging.info("OOps: Something Else", err)
             sd = "✅"
             await message.message.edit_text(
                 "SD запущена\n" + getTxt(), reply_markup=getStart()
             )
 
-# upload Lora
+# save prompt
+@dp.callback_query_handler(text="save_prompt")
+async def inl_save_prompt(callback: types.CallbackQuery) -> None:
+    logging.info("inl_save_prompt")
+    global data, chatHistoryPrompt
+    data['prompt'] = chatHistoryPrompt
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getPromptFromJson(0), getStart(0)])
+    await bot.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.message_id,
+        text='Промпт сохранён: ' + chatHistoryPrompt,
+        reply_markup=keyboard
+    )
+
+# upload result.json from chat history
+@dp.callback_query_handler(text="uplchat")
+@dp.callback_query_handler(text="next")
+async def inl_uplchat(callback: types.CallbackQuery) -> None:
+    logging.info("inl_uplchat")
+    # TODO cache chatHistory
+    global chatHistory, chatHistoryPrompt
+    file = await chatHistory.download()
+    with open(file.name, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    t = random.choice(data['messages'])['text']
+    if t == '':
+        while True:
+            t2 = random.choice(data['messages'])['text']
+            if t2 != '':
+                t = t2
+                break
+
+    chatHistoryPrompt = translateRuToEng(t)
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getPromptFromJson(0), getStart(0)])
+    await bot.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.message_id,
+        text=translateRuToEng(t).replace('<', '&lt;').replace('>', '&gt;'),
+        reply_markup=keyboard,
+        parse_mode = types.ParseMode.HTML
+    )
+
+
+# upload Lora/Model
 @dp.callback_query_handler(text="uplora")
 @dp.callback_query_handler(text="uplmodel")
 async def inl_uplora(callback: types.CallbackQuery) -> None:
-    print("inl_uplora")
+    logging.info("inl_uplora")
     global doc
     if callback.data == 'uplora':
         folder_path = Path('../../models/Lora')
@@ -579,7 +642,7 @@ async def inl_uplora(callback: types.CallbackQuery) -> None:
 @dp.message_handler(commands=["reset_param"])
 @dp.callback_query_handler(text="reset_param")
 async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_reset_param")
+    logging.info("inl_reset_param")
     global data
     global dataParams
     global dataOld
@@ -594,7 +657,7 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
 @dp.message_handler(commands=["fast_param"])
 @dp.callback_query_handler(text="fast_param")
 async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_fast_param")
+    logging.info("inl_fast_param")
     global data
     global dataParams
     data['steps'] = 35
@@ -623,7 +686,7 @@ async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> 
 @dp.message_handler(commands=["skip"])
 @dp.callback_query_handler(text="skip")
 async def inl_skip(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print('inl_skip')
+    logging.info('inl_skip')
     # Создаем сессию
     async with aiohttp.ClientSession() as session:
         # Отправляем POST-запрос ко второму сервису
@@ -647,6 +710,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         chatId = message.chat.id
     else:
         chatId = message.message.chat.id
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     global sd
     dataPromptOld = data['prompt']
     if sd == '✅':
@@ -683,8 +747,12 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
                 await bot.delete_message(chat_id=msgTime.chat.id, message_id=msgTime.message_id)
             except Exception as e:
                 logging.error(f"gen error: {e}")
-
-        keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
+                await bot.send_message(
+                    chat_id=chatId,
+                    text=e,
+                    reply_markup=keyboard,
+                    parse_mode="Markdown",
+                )
         await bot.send_message(
             chat_id=chatId,
             text=f"`{dataPromptOld}`",
@@ -698,7 +766,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
 # Получить меню действий с промптами
 @dp.callback_query_handler(text="prompt")
 async def cmd_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("cmd_prompt")
+    logging.info("cmd_prompt")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Опции", message, keyboard)
 
@@ -706,7 +774,7 @@ async def cmd_prompt(message: Union[types.Message, types.CallbackQuery]) -> None
 @dp.message_handler(commands=["opt"])
 @dp.callback_query_handler(text="opt")
 async def cmd_opt(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("cmd_opt")
+    logging.info("cmd_opt")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
     await getKeyboardUnion("Опции", message, keyboard)
 
@@ -714,7 +782,7 @@ async def cmd_opt(message: Union[types.Message, types.CallbackQuery]) -> None:
 @dp.message_handler(commands=["sttngs"])
 @dp.callback_query_handler(text="sttngs")
 async def inl_sttngs(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_sttngs")
+    logging.info("inl_sttngs")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Настройки", message, keyboard)
 
@@ -722,7 +790,7 @@ async def inl_sttngs(message: Union[types.Message, types.CallbackQuery]) -> None
 @dp.message_handler(commands=["scrpts"])
 @dp.callback_query_handler(text="scrpts")
 async def inl_scrpts(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_scrpts")
+    logging.info("inl_scrpts")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getOpt(0), getStart(0)])
     await getKeyboardUnion("Скрипты", message, keyboard)
 
@@ -730,7 +798,7 @@ async def inl_scrpts(message: Union[types.Message, types.CallbackQuery]) -> None
 @dp.message_handler(commands=["mdl"])
 @dp.callback_query_handler(text="mdl")
 async def inl_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_mdl")
+    logging.info("inl_mdl")
     global sd
     if sd == '✅':
         menu = get_models()
@@ -746,7 +814,7 @@ async def inl_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
 @dp.message_handler(commands=["sampler_name"])
 @dp.callback_query_handler(text="smplr")
 async def inl_smplr(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_smplr")
+    logging.info("inl_smplr")
     global sd
     if sd == '✅':
         menu = get_samplers_list()
@@ -762,7 +830,7 @@ async def inl_smplr(message: Union[types.Message, types.CallbackQuery]) -> None:
 @dp.message_handler(commands=["hr_upscaler"])
 @dp.callback_query_handler(text="hr")
 async def inl_hr(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("inl_hr")
+    logging.info("inl_hr")
     global sd
     if sd == '✅':
         menu = get_hr_list()
@@ -776,7 +844,7 @@ async def inl_hr(message: Union[types.Message, types.CallbackQuery]) -> None:
 # Вызов change_param
 @dp.callback_query_handler(text="change_param")
 async def inl_change_param(callback: types.CallbackQuery) -> None:
-    print("inl_change_param")
+    logging.info("inl_change_param")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     json_list = [f"/{key} = {value}" for key, value in data.items()]
     json_list_params = [f"/{key} = {value}" for key, value in dataParams.items()]
@@ -790,19 +858,19 @@ async def inl_change_param(callback: types.CallbackQuery) -> None:
 @dp.message_handler(commands=["rnd_mdl"])
 @dp.callback_query_handler(text='rnd_mdl')
 async def inl_rnd_mdl(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print('inl_rnd_mdl')
+    logging.info('inl_rnd_mdl')
     await rnd_script(message, 'models')
 
 # script random gen from models
 @dp.message_handler(commands=["rnd_smp"])
 @dp.callback_query_handler(text='rnd_smp')
 async def inl_rnd_smp(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print('inl_rnd_smp')
+    logging.info('inl_rnd_smp')
     await rnd_script(message, 'samplers')
 
 # inf function
 async def inf_func(chatId):
-    print('inf_func')
+    logging.info('inf_func')
     # SCALE
     data['cfg_scale'] = round(random.uniform(4.7, 15), 1)
     # STEPS
@@ -832,19 +900,26 @@ async def inf_func(chatId):
 
     data["use_async"] = False
     # GEN
-    res = api.txt2img(**data)
-    await show_thumbs(chatId, res)
-    await bot.send_message(
-        chat_id=chatId,
-        text=get_prompt_settings(),
-        parse_mode=types.ParseMode.HTML
-    )
+    try:
+        res = api.txt2img(**data)
+        await show_thumbs(chatId, res)
+        await bot.send_message(
+            chat_id=chatId,
+            text=get_prompt_settings(),
+            parse_mode=types.ParseMode.HTML
+        )
+    except Exception as e:
+        await bot.send_message(
+            chat_id=chatId,
+            text=e,
+            parse_mode=types.ParseMode.HTML
+        )
 
 # script random infinity gen from https://random-word-api.herokuapp.com/word?lang=en
 @dp.message_handler(commands=["inf"])
 @dp.callback_query_handler(text='inf')
 async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print('inl_rnd_inf')
+    logging.info('inl_rnd_inf')
     global dataParams # ?
     if hasattr(message, "content_type"):
         chatId = message.chat.id
@@ -875,7 +950,7 @@ async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> Non
 @dp.message_handler(commands=["get_lora"])
 @dp.callback_query_handler(text="get_lora")
 async def getLora(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("getLora")
+    logging.info("getLora")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getScripts(0), getOpt(0), getStart(0)])
     # Путь к папке "Lora"
     path = "../../models/Lora"
@@ -899,7 +974,7 @@ async def getLora(message: Union[types.Message, types.CallbackQuery]) -> None:
 @dp.message_handler(commands=["lxc_prompt"])
 @dp.callback_query_handler(text="lxc_prompt")
 async def get_lxc_prompt(message: Union[types.Message, types.CallbackQuery]) -> None:
-    print("get_lxc_prompt")
+    logging.info("get_lxc_prompt")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPrompt(0), getOpt(0), getStart(0)])
     txt = rnd_prmt_lxc()
     await getKeyboardUnion(txt, message, keyboard)
@@ -917,7 +992,7 @@ async def get_prompt(message: Union[types.Message, types.CallbackQuery]) -> None
 # тыкнули на модельку
 @dp.callback_query_handler(text_startswith="models")
 async def inl_models(callback: types.CallbackQuery) -> None:
-    print('inl_models')
+    logging.info('inl_models')
     menu = get_models()
     menu.append(getOpt(0))
     menu.append(getStart(0))
@@ -930,7 +1005,7 @@ async def inl_models(callback: types.CallbackQuery) -> None:
 # тыкнули на сэмплер
 @dp.callback_query_handler(text_startswith="samplers")
 async def inl_samplers(callback: types.CallbackQuery) -> None:
-    print('inl_samplers')
+    logging.info('inl_samplers')
     smplr = callback.data.split("|")[1]
     options = {}
     options['sampler_name'] = smplr
@@ -944,7 +1019,7 @@ async def inl_samplers(callback: types.CallbackQuery) -> None:
 # тыкнули на hr_upscaler
 @dp.callback_query_handler(text_startswith="hrs")
 async def inl_hrs(callback: types.CallbackQuery) -> None:
-    print('inl_hrs')
+    logging.info('inl_hrs')
     hrs = callback.data.split("|")[1]
     options = {}
     options['hr_upscaler'] = hrs
@@ -959,7 +1034,7 @@ async def inl_hrs(callback: types.CallbackQuery) -> None:
 @dp.callback_query_handler(text_startswith="✅")
 @dp.callback_query_handler(text_startswith="❌")
 async def inl_yes_no(callback: types.CallbackQuery) -> None:
-    print('inl_yes_no')
+    logging.info('inl_yes_no')
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getStart(0)])
     if callback.data[:1] == "✅":
         if callback.data[1:] in data.keys():
@@ -982,7 +1057,7 @@ async def inl_yes_no(callback: types.CallbackQuery) -> None:
 # Ввели любой текст
 @dp.message_handler(lambda message: True)
 async def change_json(message: types.Message):
-    print("change_json")
+    logging.info("change_json")
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     text = message.text
     nam = text.split()[0][1:]  # txt из /txt 321
@@ -1002,7 +1077,7 @@ async def change_json(message: types.Message):
                     if nam in state_names:
                         await getattr(Form, nam).set()
                     else:
-                        print("Ошибка какая-то")
+                        logging.info("Ошибка какая-то")
             if nam in dataParams.keys():
                 if str(dataParams[nam]).lower() in ['true', 'false']:
                     await message.answer(
@@ -1015,7 +1090,7 @@ async def change_json(message: types.Message):
                     if nam in state_names:
                         await getattr(Form, nam).set()
                     else:
-                        print("Ошибка какая-то")
+                        logging.info("Ошибка какая-то")
         else:
             # /txt 321 пишем 321 в data['txt']
             # Ý 0,1 into 0.1
@@ -1023,14 +1098,13 @@ async def change_json(message: types.Message):
             if str(args[1:2]) == ",":
                 newArgs = args.replace(',','.')
             data[nam] = newArgs
-            print(args)
             # TODO answer поменять на edit_text
             await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
             await message.answer(
                 f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
             )
     else:
-        data["prompt"] = message.text
+        data["prompt"] = translateRuToEng(message.text)
         await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         await message.answer(
             f"Записали промпт. JSON параметры:\n{getJson()}\n{getJson(1)}",
@@ -1040,7 +1114,7 @@ async def change_json(message: types.Message):
 # Ввели ответ на change_json
 @dp.message_handler(state=Form)
 async def answer_handler(message: types.Message, state: FSMContext):
-    print('answer_handler')
+    logging.info('answer_handler')
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     current_state = await state.get_state()  # Form:команда
     txt = message.text
@@ -1063,11 +1137,19 @@ async def answer_handler(message: types.Message, state: FSMContext):
 
 @dp.message_handler(content_types=['document'])
 async def handle_file(message: types.Message):
-    print('handle_file')
-    global doc
-    doc = message.document
-    keysArr = [InlineKeyboardButton("Lora",  callback_data="uplora"),
-               InlineKeyboardButton("Model", callback_data="uplmodel"),]
+    logging.info('handle_file')
+
+    #
+    if message.document.file_name == 'result.json':
+        global chatHistory
+        if chatHistory == '':
+            chatHistory = message.document
+    else:
+        global doc
+        doc = message.document
+    keysArr = [InlineKeyboardButton("Lora",         callback_data="uplora"),
+               InlineKeyboardButton("Model",        callback_data="uplmodel"),
+               InlineKeyboardButton("Chat History", callback_data="uplchat"),]
     await bot.send_message(
         chat_id=message.chat.id,
         text="Что грузим?",

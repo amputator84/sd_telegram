@@ -59,8 +59,8 @@ _**help**
 help  
 
 If you send file, view 2 command:  
-_**uplora**  
-_**uplmodel**  
+_**Lora**  
+_**Model**  
 
 Uploading files to folders:  
 \models\Stable-diffusion
@@ -73,20 +73,19 @@ Please pay attention to the file size limit in Telegram API:
 [sending-files](https://core.telegram.org/bots/api#sending-files)  
 [senddocument](https://core.telegram.org/bots/api#senddocument)
 
+_**Chat History**  
+We go into any Telegram chat with prompts (individual messages), click three dots in the upper right corner, upload only text messages in json format. We get the result.json file, which we throw into the bot and select "Chat History". We get a random prompt, which we can save in data  
 
 <img src="https://raw.githubusercontent.com/partyfind/sd_bot/master/trash/photo_2023-06-22_15-29-24.jpg" alt="drawing" width="400"/>
 <img src="https://raw.githubusercontent.com/partyfind/sd_bot/master/trash/photo_2023-06-22_15-29-27.jpg" width="350"/>
 
 **TODO**  
 1. use share link (not yet possible, because the API is running in the background)  
-2. Logging
-3. show error in tg
-4. translate
-5. Get all files/pictures from the computer for today (preview and seeds)
-6. Ability to send everything with one command with settings
-7. Preloading photos when waiting for a long time so that you can skip
-8. Uploading random.json from export TG channel
-9. Progress in script
+2. show error in tg  
+3. Get all files/pictures from the computer for today (preview and seeds)
+4. Ability to send everything with one command with settings
+5. Preloading photos when waiting for a long time so that you can skip
+6. Progress in script
 
 **TNX**  
 [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui)  

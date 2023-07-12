@@ -10,6 +10,7 @@ pip install aiogram
 pip install webuiapi  
 pip install translate  
 pip install transformers  
+pip install vk_api  
 cd C:\stable-diffusion-webui\extensions\sd_telegram\  
 python bot.py
 ``````
@@ -76,6 +77,9 @@ Please pay attention to the file size limit in Telegram API:
 _**Chat History**  
 We go into any Telegram chat with prompts (individual messages), click three dots in the upper right corner, upload only text messages in json format. We get the result.json file, which we throw into the bot and select "Chat History". We get a random prompt, which we can save in data  
 
+If you chose _/img_real = true_, the document will be unloaded for you, and after it the social network **VK** upload button.
+Before that, you need to set up a token and enter the ID of the album where the photo will be sent.  
+
 <img src="https://raw.githubusercontent.com/partyfind/sd_bot/master/trash/photo_2023-06-22_15-29-24.jpg" alt="drawing" width="400"/>
 <img src="https://raw.githubusercontent.com/partyfind/sd_bot/master/trash/photo_2023-06-22_15-29-27.jpg" width="350"/>
 
@@ -86,6 +90,7 @@ We go into any Telegram chat with prompts (individual messages), click three dot
 4. Ability to send everything with one command with settings
 5. Preloading photos when waiting for a long time so that you can skip
 6. Progress in script
+7. Translator capable of translating up to 4000 characters and detecting the language  
 
 **TNX**  
 [AUTOMATIC1111](https://github.com/AUTOMATIC1111/stable-diffusion-webui)  

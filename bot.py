@@ -31,6 +31,8 @@ from translate import Translator
 import base64
 from pathlib import Path
 import logging
+import vk_api
+from vk_api import VkUpload
 
 # Настройка логгера
 logging.basicConfig(format="[%(asctime)s] %(levelname)s : %(name)s : %(message)s",
@@ -41,9 +43,16 @@ logging.getLogger('aiogram').setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # from https://t.me/BotFather
-API_TOKEN = "TOKEN_HERE"
+API_BOT_TOKEN = "TOKEN_HERE"
+#заходим в https://oauth.vk.com/authorize?client_id=123&scope=photos&redirect_uri=http%3A%2F%2Foauth.vk.com%2Fblank.html&display=page&response_type=token,
+# где 123 - номер вашего включенного приложения, созданного в https://vk.com/apps?act=manage,
+# photos - зона доступа.
+# После перехода и подтверждения выцепляем access_token из адресной строки
+# TODO auto requests
+VK_TOKEN = 'TOKEN_HERE'
+vk_album_id = '789'  # брать с адресной строки, когда открываешь ВК. Пример https://vk.com/album123_789
 
-bot = Bot(token=API_TOKEN)
+bot = Bot(token=API_BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
@@ -198,7 +207,7 @@ def rnd_prmt_lxc():
     return txt
 
 # get settings. TODO - cut 4000 symbols
-def get_prompt_settings():
+def get_prompt_settings(typeCode = 'HTML'):
     global sd
     prompt = data['prompt'].replace('<', '&lt;').replace('>', '&gt;')
     cfg_scale = data['cfg_scale']
@@ -211,7 +220,10 @@ def get_prompt_settings():
         sd_model_checkpoint = dataParams['sd_model_checkpoint']
     else:
         sd_model_checkpoint = api.get_options()['sd_model_checkpoint']
-    txt = f"prompt = <code>{prompt}</code>\nsteps = {steps} \ncfg_scale = {cfg_scale} \nwidth = {width} \nheight = {height} \nsampler_name = {sampler_name} \nsd_model_checkpoint = {sd_model_checkpoint} \nnegative_prompt = <code>{negative_prompt}</code> "
+    if typeCode == 'HTML':
+        txt = f"prompt = <code>{prompt}</code>\nsteps = {steps} \ncfg_scale = {cfg_scale} \nwidth = {width} \nheight = {height} \nsampler_name = {sampler_name} \nsd_model_checkpoint = {sd_model_checkpoint} \nnegative_prompt = <code>{negative_prompt}</code> "
+    else:
+        txt = f"prompt = {prompt}\n\nsteps = {steps} cfg_scale = {cfg_scale} width = {width} height = {height} sampler_name = {sampler_name} sd_model_checkpoint = {sd_model_checkpoint} \n\nnegative_prompt = {negative_prompt} "
     return txt
 
 # Translate
@@ -606,12 +618,12 @@ async def inl_uplchat(callback: types.CallbackQuery) -> None:
                 t = t2
                 break
 
-    chatHistoryPrompt = translateRuToEng(t)
+    chatHistoryPrompt = t#translateRuToEng(t)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getPromptFromJson(0), getStart(0)])
     await bot.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.message_id,
-        text=translateRuToEng(t).replace('<', '&lt;').replace('>', '&gt;'),
+        text=t.replace('<', '&lt;').replace('>', '&gt;'),#translateRuToEng(t).replace('<', '&lt;').replace('>', '&gt;'),
         reply_markup=keyboard,
         parse_mode = types.ParseMode.HTML
     )
@@ -736,8 +748,17 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
                         chat_id=chatId, media=pilToImages(res, "tg")
                     )
                 if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-                    await bot.send_media_group(
-                        chat_id=chatId, media=pilToImages(res, "real")
+                    mes_file = await bot.send_media_group(
+                        chat_id=chatId,
+                        media=pilToImages(res, "real")
+                    )
+                    # send button load in VK
+                    # TODO long message
+                    await bot.send_message(
+                        chat_id=chatId,
+                        text="↓ send to VK",
+                        reply_markup=InlineKeyboardMarkup(
+                            inline_keyboard=[[InlineKeyboardButton(mes_file[0].document.file_id, callback_data='send_vk')]])
                     )
                 await bot.send_message(
                     chat_id=chatId,
@@ -762,6 +783,37 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
     else:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
         await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
+
+# upload in VK
+@dp.callback_query_handler(text="send_vk")
+async def inl_samplers(callback: types.CallbackQuery) -> None:
+    try:
+        global VK_TOKEN, vk_album_id
+        file_id = callback.message.reply_markup.inline_keyboard[0][0].text #TODO
+        file_obj = await bot.get_file(file_id)
+        vk_session = vk_api.VkApi(token=VK_TOKEN)
+        vk_upload = VkUpload(vk_session)
+        file_url = f'https://api.telegram.org/file/bot{API_BOT_TOKEN}/{file_obj.file_path}'
+
+        #TODO optimize
+        with open('temp.png', 'wb') as file:
+            file.write(requests.get(file_url).content)
+        vk_upload.photo(
+            photos='temp.png',
+            album_id=vk_album_id,
+            caption=get_prompt_settings(0)
+        )
+        # clear garbage
+        os.remove('temp.png')
+        await callback.message.edit_text(
+            'Фотка в VK загружена'
+        )
+    except Exception as e:
+        await bot.send_message(
+            chat_id=callback.message.chat.id,
+            text=e,
+            parse_mode=types.ParseMode.HTML
+        )
 
 # Получить меню действий с промптами
 @dp.callback_query_handler(text="prompt")
@@ -1104,7 +1156,7 @@ async def change_json(message: types.Message):
                 f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
             )
     else:
-        data["prompt"] = translateRuToEng(message.text)
+        data["prompt"] = message.text#translateRuToEng(message.text)
         await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
         await message.answer(
             f"Записали промпт. JSON параметры:\n{getJson()}\n{getJson(1)}",

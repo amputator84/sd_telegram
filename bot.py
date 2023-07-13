@@ -32,7 +32,8 @@ import base64
 from pathlib import Path
 import logging
 import vk_api
-from vk_api import VkUpload
+from vk_api import VkUpload #https://github.com/python273/vk_api
+from ok_api import OkApi, Upload # https://github.com/needkirem/ok_api
 
 # Настройка логгера
 logging.basicConfig(format="[%(asctime)s] %(levelname)s : %(name)s : %(message)s",
@@ -49,8 +50,27 @@ API_BOT_TOKEN = "TOKEN_HERE"
 # photos - зона доступа.
 # После перехода и подтверждения выцепляем access_token из адресной строки
 # TODO auto requests
-VK_TOKEN = 'TOKEN_HERE'
-vk_album_id = '789'  # брать с адресной строки, когда открываешь ВК. Пример https://vk.com/album123_789
+# OK https://ok.ru/vitrine/myuploaded
+# Добавить приложение - https://ok.ru/app/setup
+# дбавить платформу - OAUTH
+# VALUABLE_ACCESS = Обязательно
+# PHOTO_CONTENT = Обязательно
+# Ссылка на страницу = https://apiok.ru/oauth_callback
+# Список разрешённых redirect_uri = https://apiok.ru/oauth_callback
+# сохранить, перезайти
+# Ищем ID приложения справа от "Основные настройки приложения" - ID 123
+# Открываем в браузере https://connect.ok.ru/oauth/authorize?client_id=123&scope=PHOTO_CONTENT;VALUABLE_ACCESS&response_type=token&redirect_uri=https://apiok.ru/oauth_callback
+# С адресной строки копируем token в access_token ниже
+# application_key = Публичный ключ справа от "Основные настройки приложения"
+# Вечный access_token - Получить новый
+# application_secret_key = Session_secret_key
+VK_TOKEN = 'VK_TOKEN_HERE'
+API_BOT_TOKEN = 'API_BOT_TOKEN_HERE'
+VK_ALBUM_ID = 'VK_ALBUM_ID' # брать с адресной строки, когда открываешь ВК. Пример https://vk.com/album123_789
+OK_ACCESS_TOKEN = 'OK_ACCESS_TOKEN_HERE'
+OK_APPLICATION_KEY = 'OK_APPLICATION_KEY_HERE'
+OK_APPLICATION_SECRET_KEY = 'OK_APPLICATION_SECRET_KEY_HERE'
+OK_GROUP_ID = 'OK_GROUP_ID_HERE'
 
 bot = Bot(token=API_BOT_TOKEN)
 storage = MemoryStorage()
@@ -516,8 +536,14 @@ async def show_thumbs(chat_id, res):
             chat_id=chat_id, media=pilToImages(res, "tg")
         )
     if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-        await bot.send_media_group(
+        mes_file = await bot.send_media_group(
             chat_id=chat_id, media=pilToImages(res, "real")
+        )
+        await bot.send_message(
+                chat_id=chat_id,
+                text="⬇ send to VK and OK ⬇",
+                reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[[InlineKeyboardButton(mes_file[0].document.file_id, callback_data='send_vk')]])
         )
 
 # -------- COMMANDS ----------
@@ -756,7 +782,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
                     # TODO long message
                     await bot.send_message(
                         chat_id=chatId,
-                        text="↓ send to VK",
+                        text="⬇ send to VK and OK ⬇",
                         reply_markup=InlineKeyboardMarkup(
                             inline_keyboard=[[InlineKeyboardButton(mes_file[0].document.file_id, callback_data='send_vk')]])
                     )
@@ -785,10 +811,12 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
         await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
 
 # upload in VK
+# TODO actual prompt
 @dp.callback_query_handler(text="send_vk")
-async def inl_samplers(callback: types.CallbackQuery) -> None:
+async def send_vk(callback: types.CallbackQuery) -> None:
     try:
-        global VK_TOKEN, vk_album_id
+        # Export VK
+        global VK_TOKEN, VK_ALBUM_ID, OK_ACCESS_TOKEN, OK_APPLICATION_KEY, OK_APPLICATION_SECRET_KEY, OK_GROUP_ID
         file_id = callback.message.reply_markup.inline_keyboard[0][0].text #TODO
         file_obj = await bot.get_file(file_id)
         vk_session = vk_api.VkApi(token=VK_TOKEN)
@@ -800,13 +828,26 @@ async def inl_samplers(callback: types.CallbackQuery) -> None:
             file.write(requests.get(file_url).content)
         vk_upload.photo(
             photos='temp.png',
-            album_id=vk_album_id,
-            caption=get_prompt_settings(0)
+            album_id=VK_ALBUM_ID,
+            caption=data['prompt'] #TODO actual from ID message
         )
+        # Export OK
+        ok = OkApi(
+            access_token=OK_ACCESS_TOKEN,
+            application_key=OK_APPLICATION_KEY,
+            application_secret_key=OK_APPLICATION_SECRET_KEY)
+        group_id = OK_GROUP_ID
+        upload = Upload(ok)
+        upload_response = upload.photo(photos=['temp.png'], album=group_id)
+        for photo_id in upload_response['photos']:
+            token = upload_response['photos'][photo_id]['token']
+            response = ok.photosV2.commit(photo_id=photo_id, token=token, comment=data['prompt'])
+            print(response.text)
+
         # clear garbage
         os.remove('temp.png')
         await callback.message.edit_text(
-            'Фотка в VK загружена'
+            'Фотка в VK и OK загружена'
         )
     except Exception as e:
         await bot.send_message(

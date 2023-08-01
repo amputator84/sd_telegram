@@ -45,8 +45,8 @@ logger = logging.getLogger(__name__)
 
 # from https://t.me/BotFather
 API_BOT_TOKEN = "TOKEN_HERE"
-#заходим в https://oauth.vk.com/authorize?client_id=123&scope=photos&redirect_uri=http%3A%2F%2Foauth.vk.com%2Fblank.html&display=page&response_type=token,
-# где 123 - номер вашего включенного приложения, созданного в https://vk.com/apps?act=manage,
+#заходим в https://oauth.vk.com/authorize?client_id=51626357&scope=photos&redirect_uri=http%3A%2F%2Foauth.vk.com%2Fblank.html&display=page&response_type=token
+# где 51626357 - номер вашего включенного приложения, созданного в https://vk.com/apps?act=manage,
 # photos - зона доступа.
 # После перехода и подтверждения выцепляем access_token из адресной строки
 # TODO auto requests
@@ -58,8 +58,8 @@ API_BOT_TOKEN = "TOKEN_HERE"
 # Ссылка на страницу = https://apiok.ru/oauth_callback
 # Список разрешённых redirect_uri = https://apiok.ru/oauth_callback
 # сохранить, перезайти
-# Ищем ID приложения справа от "Основные настройки приложения" - ID 123
-# Открываем в браузере https://connect.ok.ru/oauth/authorize?client_id=123&scope=PHOTO_CONTENT;VALUABLE_ACCESS&response_type=token&redirect_uri=https://apiok.ru/oauth_callback
+# Ищем ID приложения справа от "Основные настройки приложения" - ID 512002358821
+# Открываем в браузере https://connect.ok.ru/oauth/authorize?client_id=512002358821&scope=PHOTO_CONTENT;VALUABLE_ACCESS&response_type=token&redirect_uri=https://apiok.ru/oauth_callback
 # С адресной строки копируем token в access_token ниже
 # application_key = Публичный ключ справа от "Основные настройки приложения"
 # Вечный access_token - Получить новый
@@ -71,6 +71,7 @@ OK_ACCESS_TOKEN = 'OK_ACCESS_TOKEN_HERE'
 OK_APPLICATION_KEY = 'OK_APPLICATION_KEY_HERE'
 OK_APPLICATION_SECRET_KEY = 'OK_APPLICATION_SECRET_KEY_HERE'
 OK_GROUP_ID = 'OK_GROUP_ID_HERE'
+ARRAY_INLINE = []
 
 bot = Bot(token=API_BOT_TOKEN)
 storage = MemoryStorage()
@@ -132,7 +133,7 @@ def start_sd():
     global process, sd
     if not process:
         logging.info('start_process start_sd')
-        process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers", "--disable-nan-check"])
+        process = subprocess.Popen(["python", "../../launch.py", "--nowebui", "--xformers"]) #, "--disable-nan-check"
         sd = "✅"
 
 async def stop_sd():
@@ -399,6 +400,18 @@ def getSet(returnAll = 1) -> InlineKeyboardMarkup:
     ]
     return (getKeyboard(keysArr, returnAll))
 
+# Меню быстрых параметров
+def getFastParams(returnAll = 1) -> InlineKeyboardMarkup:
+    keysArr = [
+        InlineKeyboardButton("comp",   callback_data="fp_comp"),
+        InlineKeyboardButton("mobile", callback_data="fp_mobile"),
+        InlineKeyboardButton("no hr",  callback_data="fp_no_hr"),
+        InlineKeyboardButton("big",    callback_data="fp_big"),
+        InlineKeyboardButton("inc",    callback_data="fp_inc"),
+        InlineKeyboardButton("w↔h",    callback_data="fp_wh"),
+    ]
+    return (getKeyboard(keysArr, returnAll))
+
 # Меню галочек Да/Нет
 def getYesNo(returnAll = 1, nam = '') -> InlineKeyboardMarkup:
     keysArr = [
@@ -536,14 +549,26 @@ async def show_thumbs(chat_id, res):
             chat_id=chat_id, media=pilToImages(res, "tg")
         )
     if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-        mes_file = await bot.send_media_group(
-            chat_id=chat_id, media=pilToImages(res, "real")
+        messages = await bot.send_media_group(
+            chat_id=chat_id,
+            media=pilToImages(res, "real")
         )
+        # send button load in VK
+        arr = []
+        i = 0
+        for mes_file in messages:
+            i = i + 1
+            print(mes_file)
+            ARRAY_INLINE.append({'message_id': str(mes_file.message_id),
+                                 'num_but': str(i),
+                                 'file_id': str(mes_file.document.file_id),
+                                 'prompt': get_prompt_settings(0)})
+            arr.append(InlineKeyboardButton(i, callback_data='send_vk|' + str(mes_file.message_id)))
         await bot.send_message(
-                chat_id=chat_id,
-                text="⬇ send to VK and OK ⬇",
-                reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[[InlineKeyboardButton(mes_file[0].document.file_id, callback_data='send_vk')]])
+            chat_id=chat_id,
+            text="⬇ send to VK and OK ⬇",
+            reply_markup=InlineKeyboardMarkup(
+                inline_keyboard=[arr])
         )
 
 # -------- COMMANDS ----------
@@ -696,28 +721,114 @@ async def inl_reset_param(message: Union[types.Message, types.CallbackQuery]) ->
 @dp.callback_query_handler(text="fast_param")
 async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> None:
     logging.info("inl_fast_param")
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getFastParams(0), getSet(0), getOpt(0), getStart(0)])
+    await getKeyboardUnion('Выбери быстрые настройки', message, keyboard, '')
+
+# Список быстрых настроек
+@dp.message_handler(commands=["fp_comp"])
+@dp.message_handler(commands=["fp_mobile"])
+@dp.message_handler(commands=["fp_no_hr"])
+@dp.message_handler(commands=["fp_big"])
+@dp.message_handler(commands=["fp_inc"])
+@dp.message_handler(commands=["fp_wh"])
+@dp.callback_query_handler(text="fp_comp")
+@dp.callback_query_handler(text="fp_mobile")
+@dp.callback_query_handler(text="fp_no_hr")
+@dp.callback_query_handler(text="fp_big")
+@dp.callback_query_handler(text="fp_inc")
+@dp.callback_query_handler(text="fp_wh")
+async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
+    logging.info("inl_fp")
+    m = message.data
+    keyboard = InlineKeyboardMarkup(inline_keyboard=[getFastParams(0), getSet(0), getOpt(0), getStart(0)])
     global data
     global dataParams
-    data['steps'] = 35
-    data['sampler_name'] = 'Euler a'
-    data['enable_hr'] = 'True'
-    data['denoising_strength'] = '0.5'
-    data['hr_upscaler'] = 'ESRGAN_4x'
-    data['hr_second_pass_steps'] = '10'
-    data['cfg_scale'] = '6'
-    data['width'] = '512'
-    data['height'] = '768'
-    data['restore_faces'] = 'true'
-    data['do_not_save_grid'] = 'true'
-    data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
-    data['save_images'] = 'true'
-    dataParams = {"img_thumb": "false",
-                  "img_tg": "true",
-                  "img_real": "true",
-                  "stop_sd": "true",
-                  "use_prompt": "true"}
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
-    txt = f"JSON сброшен\n{getJson()}\n{getJson(1)}"
+    if m == 'fp_wh':
+        w = data['width']
+        data['width'] = data['height']
+        data['height'] = w
+    if m == 'fp_comp':
+        data['steps'] = 35
+        data['sampler_name'] = 'Euler a'
+        data['enable_hr'] = 'True'
+        data['denoising_strength'] = '0.5'
+        data['hr_upscaler'] = 'ESRGAN_4x'
+        data['hr_second_pass_steps'] = '10'
+        data['cfg_scale'] = '6'
+        data['width'] = '512'
+        data['height'] = '768'
+        data['restore_faces'] = 'true'
+        data['do_not_save_grid'] = 'true'
+        data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
+        data['save_images'] = 'true'
+        dataParams = {"img_thumb": "false",
+                      "img_tg": "true",
+                      "img_real": "true",
+                      "stop_sd": "true",
+                      "use_prompt": "true"}
+    if m == 'fp_mobile':
+        data['steps'] = 15
+        data['enable_hr'] = 'false'
+        data['cfg_scale'] = '6'
+        data['width'] = '512'
+        data['height'] = '768'
+        data['do_not_save_grid'] = 'true'
+        data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
+        data['save_images'] = 'true'
+        dataParams = {"img_thumb": "true",
+                      "img_tg": "false",
+                      "img_real": "true",
+                      "stop_sd": "true",
+                      "use_prompt": "true"}
+    if m == 'fp_no_hr':
+        data['steps'] = 20
+        data['enable_hr'] = 'false'
+        data['cfg_scale'] = '7'
+        data['width'] = '512'
+        data['height'] = '768'
+        data['do_not_save_grid'] = 'true'
+        data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
+        data['save_images'] = 'true'
+        dataParams = {"img_thumb": "true",
+                      "img_tg": "false",
+                      "img_real": "true",
+                      "stop_sd": "true",
+                      "use_prompt": "true"}
+    if m == 'fp_big':
+        data['steps'] = 50
+        data['sampler_name'] = 'Euler a'
+        data['enable_hr'] = 'True'
+        data['denoising_strength'] = '0.7'
+        data['hr_upscaler'] = 'ESRGAN_4x'
+        data['hr_second_pass_steps'] = '20'
+        data['cfg_scale'] = '7'
+        data['width'] = '768'
+        data['height'] = '1024'
+        data['restore_faces'] = 'true'
+        data['do_not_save_grid'] = 'true'
+        data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
+        data['save_images'] = 'true'
+        dataParams = {"img_thumb": "false",
+                      "img_tg": "true",
+                      "img_real": "true",
+                      "stop_sd": "true",
+                      "use_prompt": "true"}
+    if m == 'fp_inc':
+        data['steps'] = 20
+        data['sampler_name'] = 'Euler a'
+        data['enable_hr'] = 'false'
+        data['cfg_scale'] = '7'
+        data['width'] = '512'
+        data['height'] = '768'
+        data['do_not_save_grid'] = 'true'
+        data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
+        data['save_images'] = 'false'
+        dataParams = {"img_thumb": "true",
+                      "img_tg": "false",
+                      "img_real": "false",
+                      "stop_sd": "true",
+                      "use_prompt": "true"}
+    txt = f"JSON отредактирован\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard, '')
 
 # Обработчик команды /skip
@@ -749,7 +860,7 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
     else:
         chatId = message.message.chat.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
-    global sd
+    global sd, ARRAY_INLINE
     dataPromptOld = data['prompt']
     if sd == '✅':
         for itemTxt in data['prompt'].split(';'):
@@ -774,17 +885,26 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
                         chat_id=chatId, media=pilToImages(res, "tg")
                     )
                 if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
-                    mes_file = await bot.send_media_group(
+                    messages = await bot.send_media_group(
                         chat_id=chatId,
                         media=pilToImages(res, "real")
                     )
                     # send button load in VK
-                    # TODO long message
+                    arr = []
+                    i = 0
+                    for mes_file in messages:
+                        i = i + 1
+                        print(mes_file)
+                        ARRAY_INLINE.append({'message_id':str(mes_file.message_id),
+                                             'num_but':str(i),
+                                             'file_id':str(mes_file.document.file_id),
+                                             'prompt':get_prompt_settings(0)})
+                        arr.append(InlineKeyboardButton(i, callback_data='send_vk|'+str(mes_file.message_id)))
                     await bot.send_message(
                         chat_id=chatId,
                         text="⬇ send to VK and OK ⬇",
                         reply_markup=InlineKeyboardMarkup(
-                            inline_keyboard=[[InlineKeyboardButton(mes_file[0].document.file_id, callback_data='send_vk')]])
+                            inline_keyboard=[arr])
                     )
                 await bot.send_message(
                     chat_id=chatId,
@@ -812,47 +932,63 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
 
 # upload in VK
 # TODO actual prompt
-@dp.callback_query_handler(text="send_vk")
+@dp.callback_query_handler(text_startswith="send_vk")
 async def send_vk(callback: types.CallbackQuery) -> None:
     try:
-        # Export VK
-        global VK_TOKEN, VK_ALBUM_ID, OK_ACCESS_TOKEN, OK_APPLICATION_KEY, OK_APPLICATION_SECRET_KEY, OK_GROUP_ID
-        file_id = callback.message.reply_markup.inline_keyboard[0][0].text #TODO
+        global VK_TOKEN, VK_ALBUM_ID, OK_ACCESS_TOKEN, OK_APPLICATION_KEY, OK_APPLICATION_SECRET_KEY, OK_GROUP_ID, ARRAY_INLINE
+        message_id = callback.data.split("|")[1]
+        arrInlineItem = next(item for item in ARRAY_INLINE if item['message_id'] == message_id)
+        file_id = arrInlineItem['file_id']
+        num_but = arrInlineItem['num_but']
+        unique_prompt = arrInlineItem['prompt']
         file_obj = await bot.get_file(file_id)
+
+        # Export VK
         vk_session = vk_api.VkApi(token=VK_TOKEN)
         vk_upload = VkUpload(vk_session)
         file_url = f'https://api.telegram.org/file/bot{API_BOT_TOKEN}/{file_obj.file_path}'
-
         #TODO optimize
         with open('temp.png', 'wb') as file:
             file.write(requests.get(file_url).content)
-        vk_upload.photo(
-            photos='temp.png',
-            album_id=VK_ALBUM_ID,
-            caption=data['prompt'] #TODO actual from ID message
-        )
-        # Export OK
-        ok = OkApi(
-            access_token=OK_ACCESS_TOKEN,
-            application_key=OK_APPLICATION_KEY,
-            application_secret_key=OK_APPLICATION_SECRET_KEY)
-        group_id = OK_GROUP_ID
-        upload = Upload(ok)
-        upload_response = upload.photo(photos=['temp.png'], album=group_id)
-        for photo_id in upload_response['photos']:
-            token = upload_response['photos'][photo_id]['token']
-            response = ok.photosV2.commit(photo_id=photo_id, token=token, comment=data['prompt'])
-            print(response.text)
+        try:
+            vk_upload.photo(
+                photos='temp.png',
+                album_id=VK_ALBUM_ID,
+                caption=unique_prompt
+            )
+        except Exception as e:
+            await bot.send_message(
+                chat_id=callback.message.chat.id,
+                text='VK ERROR = '+str(e),
+                parse_mode=types.ParseMode.HTML
+            )
 
+        try:
+            # Export OK
+            ok = OkApi(
+                access_token=OK_ACCESS_TOKEN,
+                application_key=OK_APPLICATION_KEY,
+                application_secret_key=OK_APPLICATION_SECRET_KEY)
+            upload = Upload(ok)
+            upload_response = upload.photo(photos=['temp.png'], album=OK_GROUP_ID)
+            for photo_id in upload_response['photos']:
+                token = upload_response['photos'][photo_id]['token']
+                ok.photosV2.commit(photo_id=photo_id, token=token, comment=unique_prompt)
+        except Exception as e:
+            await bot.send_message(
+                chat_id=callback.message.chat.id,
+                text='OK ERROR = '+str(e),
+                parse_mode=types.ParseMode.HTML
+            )
         # clear garbage
         os.remove('temp.png')
-        await callback.message.edit_text(
-            'Фотка в VK и OK загружена'
-        )
+        # alert
+        await bot.answer_callback_query(callback.id, text='Фотка '+num_but+' в VK и OK загружена', show_alert=True)
+
     except Exception as e:
         await bot.send_message(
             chat_id=callback.message.chat.id,
-            text=e,
+            text='send_vk '+str(e),
             parse_mode=types.ParseMode.HTML
         )
 
@@ -1022,6 +1158,11 @@ async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> Non
         await bot.send_message(
             chat_id=chatId,
             text='use_prompt включен, будет использоваться промпт ' + data['prompt']
+        )
+    else:
+        await bot.send_message(
+            chat_id=chatId,
+            text=data['prompt']
         )
     while True:
         # PROMPT

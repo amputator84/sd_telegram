@@ -30,7 +30,8 @@ img_thumb/img_tg/img_real - little/original from tg/real size from doc
 ___**reset_param**  
 reset to default  
 ___**fast_param**  
-reset to my default params    
+reset to my default params  
+comp, mobile, no hr, big, inc, w↔h  
 __**scrpts**  
 ___**get_lora**  
 get list LORA`s from stable-diffusion-webui/models/Lora  
@@ -90,7 +91,7 @@ Before that, you need to set up a token and enter the ID of the album where the 
 3. Get all files/pictures from the computer for today (preview and seeds)
 4. Ability to send everything with one command with settings
 5. Preloading photos when waiting for a long time so that you can skip
-6. Progress in script
+6. Progress in script (done with no HR)
 7. Translator capable of translating up to 4000 characters and detecting the language  
 
 **TNX**  
@@ -100,5 +101,8 @@ Before that, you need to set up a token and enter the ID of the album where the 
 And respect for Santa 🎅
 
 Donations are **not needed**. Who wants to subscribe to [my generations](https://t.me/mishgenai)
+
+Lifehack`s:  
+If Lora dont work, see [this](https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/7984?ref=blog.hinablue.me#issuecomment-1514312942) 
   
 © _Mishgen_

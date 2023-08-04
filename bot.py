@@ -493,7 +493,7 @@ async def rnd_script(message, typeScript):
     numbers = list(range(len(elements)))
     random.shuffle(numbers)
     dataPromptOld = data['prompt']
-    await bot.send_message(
+    msgFor = await bot.send_message(
         chat_id=chatId,
         text='Цикл по '+str(len(elements)) + (' моделям' if typeScript == 'models' else ' семплерам') + ', ' + dataPromptOld
     )
@@ -514,8 +514,7 @@ async def rnd_script(message, typeScript):
             try:
                 res = await api.txt2img(**data)
                 await show_thumbs(chatId, res)
-                await bot.send_message(
-                    chat_id=chatId,
+                await msgFor.reply(
                     text=elements[number] if typeScript == 'models' else elements[number]['name']
                 )
             except Exception as e:

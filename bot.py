@@ -77,6 +77,15 @@ bot = Bot(token=API_BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 
+# /create_post_vk
+@dp.message_handler(commands=['create_post_vk'])
+async def create_post_vk(message: types.Message) -> None:
+    result = subprocess.run(
+        ['C:\OSPanel\modules\php\PHP_7.3\php.exe', "C:/OSPanel/domains/localhost/vk/create_post.php"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    output = result.stdout.decode('utf-8')
+    await message.reply(output, reply_markup=types.ReplyKeyboardRemove())
+
 # Получаем список аргументов функции api.txt2img и возвращаем JSON {"/prompt": "","/seed": "-1",...}
 def getAttrtxt2img():
     spec = inspect.getfullargspec(api.txt2img)
@@ -109,7 +118,8 @@ dataParams = {"img_thumb": "true",
               "img_real": "true",
               "stop_sd": "true",
               "sd_model_checkpoint": "",
-              "use_prompt": "true"}
+              "use_prompt": "true",
+              "json_prompt": "false"}
 dataOld = data.copy()
 dataOldParams = dataParams.copy()
 dataOrig = data.copy()
@@ -226,6 +236,24 @@ def rnd_prmt_lxc():
         txt = dataOrig['prompt']
     txt = random.choice(submit_get('https://lexica.art/api/v1/search?q='+txt, '').json()['images'])['prompt']
     return txt
+
+# рандомный промпт из JSON
+async def rnd_prmt_json():
+    logging.info("rnd_prmt_json")
+    global chatHistory, chatHistoryPrompt
+    file = await chatHistory.download()
+    with open(file.name, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    t = random.choice(data['messages'])['text']
+    if t == '':
+        while True:
+            t2 = random.choice(data['messages'])['text']
+            if t2 != '':
+                t = t2
+                break
+
+    chatHistoryPrompt = t
+    return t.replace('<', '&lt;').replace('>', '&gt;')
 
 # get settings. TODO - cut 4000 symbols
 def get_prompt_settings(typeCode = 'HTML'):
@@ -764,7 +792,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "img_tg": "true",
                       "img_real": "true",
                       "stop_sd": "true",
-                      "use_prompt": "true"}
+                      "use_prompt": "true",
+                      "json_prompt": "false"}
     if m == 'fp_mobile':
         data['steps'] = 15
         data['enable_hr'] = 'false'
@@ -778,7 +807,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "img_tg": "false",
                       "img_real": "true",
                       "stop_sd": "true",
-                      "use_prompt": "true"}
+                      "use_prompt": "true",
+                      "json_prompt": "false"}
     if m == 'fp_no_hr':
         data['steps'] = 20
         data['enable_hr'] = 'false'
@@ -792,7 +822,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "img_tg": "false",
                       "img_real": "true",
                       "stop_sd": "true",
-                      "use_prompt": "true"}
+                      "use_prompt": "true",
+                      "json_prompt": "false"}
     if m == 'fp_big':
         data['steps'] = 50
         data['sampler_name'] = 'Euler a'
@@ -811,7 +842,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "img_tg": "true",
                       "img_real": "true",
                       "stop_sd": "true",
-                      "use_prompt": "true"}
+                      "use_prompt": "true",
+                      "json_prompt": "false"}
     if m == 'fp_inc':
         data['steps'] = 20
         data['sampler_name'] = 'Euler a'
@@ -826,7 +858,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "img_tg": "false",
                       "img_real": "false",
                       "stop_sd": "true",
-                      "use_prompt": "true"}
+                      "use_prompt": "true",
+                      "json_prompt": "false"}
     txt = f"JSON отредактирован\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard, '')
 
@@ -1165,19 +1198,22 @@ async def inl_rnd_inf(message: Union[types.Message, types.CallbackQuery]) -> Non
         )
     while True:
         # PROMPT
-        if str(dataParams['use_prompt']).lower() == 'false':
+        if str(dataParams['use_prompt']).lower() == 'false' and str(dataParams['json_prompt']).lower() == 'false':
             t = requests.get('https://random-word-api.herokuapp.com/word?lang=en').text
             text = json.loads(t)[0] # from JSON
             prompt = get_random_prompt(text, 20)
             prompt_lxc = random.choice(submit_get('https://lexica.art/api/v1/search?q=' + prompt, '').json()['images'])['prompt']
             data['prompt'] = prompt + ', ' + prompt_lxc
             await inf_func(chatId)
-        else:
+        if str(dataParams['use_prompt']).lower() == 'true' and str(dataParams['json_prompt']).lower() == 'false':
             dataPromptOld = data['prompt']
             for itemTxt in data['prompt'].split(';'):
                 data['prompt'] = itemTxt
                 await inf_func(chatId)
             data['prompt'] = dataPromptOld
+        if str(dataParams['json_prompt']).lower() == 'true':
+            data['prompt'] = await rnd_prmt_json()
+            await inf_func(chatId)
 
 # Получить LORA
 @dp.message_handler(commands=["get_lora"])

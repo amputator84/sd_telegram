@@ -31,7 +31,7 @@ ___**reset_param**
 reset to default  
 ___**fast_param**  
 reset to my default params  
-comp, mobile, no hr, big, inc, w↔h  
+comp, mobile, no hr, big, inc, sdxl, w↔h  
 __**scrpts**  
 ___**get_lora**  
 get list LORA`s from stable-diffusion-webui/models/Lora  

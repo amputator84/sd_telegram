@@ -114,12 +114,13 @@ data['prompt'] = 'cat in space' # Ý
 data['steps'] = 15
 data['sampler_name'] = 'Euler a'
 dataParams = {"img_thumb": "true",
-              "img_tg": "true",
+              "img_tg": "false",
               "img_real": "true",
               "stop_sd": "true",
               "sd_model_checkpoint": "",
               "use_prompt": "true",
-              "json_prompt": "false"}
+              "json_prompt": "false",
+              "send_vk": "false"}
 dataOld = data.copy()
 dataOldParams = dataParams.copy()
 dataOrig = data.copy()
@@ -436,6 +437,7 @@ def getFastParams(returnAll = 1) -> InlineKeyboardMarkup:
         InlineKeyboardButton("no hr",  callback_data="fp_no_hr"),
         InlineKeyboardButton("big",    callback_data="fp_big"),
         InlineKeyboardButton("inc",    callback_data="fp_inc"),
+        InlineKeyboardButton("sdxl",   callback_data="fp_sdxl"),
         InlineKeyboardButton("w↔h",    callback_data="fp_wh"),
     ]
     return (getKeyboard(keysArr, returnAll))
@@ -523,7 +525,7 @@ async def rnd_script(message, typeScript):
     dataPromptOld = data['prompt']
     msgFor = await bot.send_message(
         chat_id=chatId,
-        text='Цикл по '+str(len(elements)) + (' моделям' if typeScript == 'models' else ' семплерам') + ', ' + dataPromptOld
+        text=dataPromptOld
     )
     for i, number in enumerate(numbers):
         time.sleep(5)
@@ -553,13 +555,8 @@ async def rnd_script(message, typeScript):
     data['prompt'] = dataPromptOld
     await bot.send_message(
         chat_id=chatId,
-        text="Готово \n"+str(dataPromptOld) +
-                    "\n cfg_scale = " + str(data['cfg_scale']) +
-                    "\n width = " + str(data['width']) +
-                    "\n height = " + str(data['height']) +
-                    "\n steps = " + str(data['steps']) +
-                    "\n negative = " + str(data['negative_prompt'])
-        ,
+        text="```Промпт " + dataPromptOld + "```cfg = " + str(data['cfg_scale'])+ " width = " + str(data['width']) +" height = " + str(data['height']) + " steps = " + str(data['steps']) + " sampler = " + str(data['sampler_name']) + "```Негатив " + str(data['negative_prompt']) + "```#SD",
+        parse_mode="Markdown",
         reply_markup=keyboard
     )
     if str(dataParams['stop_sd']).lower() == 'true':
@@ -580,23 +577,24 @@ async def show_thumbs(chat_id, res):
             chat_id=chat_id,
             media=pilToImages(res, "real")
         )
-        # send button load in VK
-        arr = []
-        i = 0
-        for mes_file in messages:
-            i = i + 1
-            print(mes_file)
-            ARRAY_INLINE.append({'message_id': str(mes_file.message_id),
-                                 'num_but': str(i),
-                                 'file_id': str(mes_file.document.file_id),
-                                 'prompt': get_prompt_settings(0)})
-            arr.append(InlineKeyboardButton(i, callback_data='send_vk|' + str(mes_file.message_id)))
-        await bot.send_message(
-            chat_id=chat_id,
-            text="⬇ send to VK and OK ⬇",
-            reply_markup=InlineKeyboardMarkup(
-                inline_keyboard=[arr])
-        )
+        if (str(dataParams['json_prompt']).lower() == 'true'):
+            # send button load in VK
+            arr = []
+            i = 0
+            for mes_file in messages:
+                i = i + 1
+                print(mes_file)
+                ARRAY_INLINE.append({'message_id': str(mes_file.message_id),
+                                     'num_but': str(i),
+                                     'file_id': str(mes_file.document.file_id),
+                                     'prompt': get_prompt_settings(0)})
+                arr.append(InlineKeyboardButton(i, callback_data='send_vk|' + str(mes_file.message_id)))
+            await bot.send_message(
+                chat_id=chat_id,
+                text="⬇ send to VK and OK ⬇",
+                reply_markup=InlineKeyboardMarkup(
+                    inline_keyboard=[arr])
+            )
 
 # -------- COMMANDS ----------
 
@@ -755,12 +753,14 @@ async def inl_fast_param(message: Union[types.Message, types.CallbackQuery]) -> 
 @dp.message_handler(commands=["fp_comp"])
 @dp.message_handler(commands=["fp_mobile"])
 @dp.message_handler(commands=["fp_no_hr"])
+@dp.message_handler(commands=["fp_sdxl"])
 @dp.message_handler(commands=["fp_big"])
 @dp.message_handler(commands=["fp_inc"])
 @dp.message_handler(commands=["fp_wh"])
 @dp.callback_query_handler(text="fp_comp")
 @dp.callback_query_handler(text="fp_mobile")
 @dp.callback_query_handler(text="fp_no_hr")
+@dp.callback_query_handler(text="fp_sdxl")
 @dp.callback_query_handler(text="fp_big")
 @dp.callback_query_handler(text="fp_inc")
 @dp.callback_query_handler(text="fp_wh")
@@ -779,12 +779,12 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
         data['sampler_name'] = 'Euler a'
         data['enable_hr'] = 'True'
         data['denoising_strength'] = '0.5'
-        data['hr_upscaler'] = 'ESRGAN_4x'
+        data['hr_upscaler'] = '4x_NMKD-Siax_200k' #https://huggingface.co/uwg/upscaler/blob/main/ESRGAN/4x_NMKD-Siax_200k.pth
         data['hr_second_pass_steps'] = '10'
         data['cfg_scale'] = '6'
         data['width'] = '512'
         data['height'] = '768'
-        data['restore_faces'] = 'true'
+        data['restore_faces'] = 'false'
         data['do_not_save_grid'] = 'true'
         data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
         data['save_images'] = 'true'
@@ -829,12 +829,12 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
         data['sampler_name'] = 'Euler a'
         data['enable_hr'] = 'True'
         data['denoising_strength'] = '0.7'
-        data['hr_upscaler'] = 'ESRGAN_4x'
+        data['hr_upscaler'] = '4x_NMKD-Siax_200k'
         data['hr_second_pass_steps'] = '20'
         data['cfg_scale'] = '7'
         data['width'] = '768'
         data['height'] = '1024'
-        data['restore_faces'] = 'true'
+        data['restore_faces'] = 'false'
         data['do_not_save_grid'] = 'true'
         data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'
         data['save_images'] = 'true'
@@ -857,6 +857,23 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
         dataParams = {"img_thumb": "true",
                       "img_tg": "false",
                       "img_real": "false",
+                      "stop_sd": "true",
+                      "use_prompt": "true",
+                      "json_prompt": "false"}
+    if m == 'fp_sdxl':
+        data['steps'] = 5
+        data['sampler_name'] = 'DPM++ SDE Karras'
+        data['enable_hr'] = 'false'
+        data['cfg_scale'] = '4'
+        data['width'] = '1024'
+        data['height'] = '1024'
+        data['restore_faces'] = 'false'
+        data['do_not_save_grid'] = 'true'
+        data['negative_prompt'] = 'FastNegativeV2'
+        data['save_images'] = 'true'
+        dataParams = {"img_thumb": "false",
+                      "img_tg": "true",
+                      "img_real": "true",
                       "stop_sd": "true",
                       "use_prompt": "true",
                       "json_prompt": "false"}
@@ -921,23 +938,24 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
                         chat_id=chatId,
                         media=pilToImages(res, "real")
                     )
-                    # send button load in VK
-                    arr = []
-                    i = 0
-                    for mes_file in messages:
-                        i = i + 1
-                        print(mes_file)
-                        ARRAY_INLINE.append({'message_id':str(mes_file.message_id),
-                                             'num_but':str(i),
-                                             'file_id':str(mes_file.document.file_id),
-                                             'prompt':get_prompt_settings(0)})
-                        arr.append(InlineKeyboardButton(i, callback_data='send_vk|'+str(mes_file.message_id)))
-                    await bot.send_message(
-                        chat_id=chatId,
-                        text="⬇ send to VK and OK ⬇",
-                        reply_markup=InlineKeyboardMarkup(
-                            inline_keyboard=[arr])
-                    )
+                    if (str(dataParams['json_prompt']).lower() == 'true'):
+                        # send button load in VK
+                        arr = []
+                        i = 0
+                        for mes_file in messages:
+                            i = i + 1
+                            print(mes_file)
+                            ARRAY_INLINE.append({'message_id':str(mes_file.message_id),
+                                                 'num_but':str(i),
+                                                 'file_id':str(mes_file.document.file_id),
+                                                 'prompt':get_prompt_settings(0)})
+                            arr.append(InlineKeyboardButton(i, callback_data='send_vk|'+str(mes_file.message_id)))
+                        await bot.send_message(
+                            chat_id=chatId,
+                            text="⬇ send to VK and OK ⬇",
+                            reply_markup=InlineKeyboardMarkup(
+                                inline_keyboard=[arr])
+                        )
                 await bot.send_message(
                     chat_id=chatId,
                     text=data["prompt"] + "\n" + str(res.info["all_seeds"])

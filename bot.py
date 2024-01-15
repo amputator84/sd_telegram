@@ -629,7 +629,7 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
             await message.message.edit_text(
                 "Запускаем SD\n" + getTxt(), reply_markup=getStart()
             )
-            url = f'http://{host}:port/docs/'
+            url = f'http://{host}:{port}/docs/'
             n = 0
             while n != 200:
                 time.sleep(2)

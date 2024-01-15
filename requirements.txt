@@ -1,0 +1,7 @@
+aiogram==2.22.2
+webuiapi
+translate
+transformers
+vk_api
+ok_api
+python-dotenv

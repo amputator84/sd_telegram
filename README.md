@@ -1,20 +1,45 @@
 # sd_telegram
-telegram bot on aiogram python 3.10.6 to generate images in automatic1111 locally
+telegram bot on aiogram to generate images with automatic1111 fast api
 
-create bot from [BotFather](https://t.me/BotFather) and use token in [API_TOKEN](https://github.com/amputator84/sd_telegram/blob/master/bot.py#L32)
-
-the bot is installed in automatic1111 via extensions or use _git clone_ into _C:\stable-diffusion-webui\extensions\sd_telegram_
-
+```bash
+cp sample.env .env
 ```
-pip install aiogram  
-pip install webuiapi  
-pip install translate  
-pip install transformers  
-pip install vk_api  
-pip install ok_api  
-cd C:\stable-diffusion-webui\extensions\sd_telegram\  
+
+create bot from [BotFather](https://t.me/BotFather) and use token in API_TOKEN variable.
+add vk and ok tokens to env file.
+
+> заходим в https://oauth.vk.com/authorize?client_id=51626357&scope=photos&redirect_uri=http%3A%2F%2Foauth.vk.com%2Fblank.html&display=page&response_type=token \
+> где 51626357 - номер вашего включенного приложения, созданного в https://vk.com/apps?act=manage, \
+> photos - зона доступа. \
+> После перехода и подтверждения выцепляем access_token из адресной строки \
+> TODO auto requests \
+> OK https://ok.ru/vitrine/myuploaded \
+> Добавить приложение - https://ok.ru/app/setup \
+> дбавить платформу - OAUTH \
+> VALUABLE_ACCESS = Обязательно \
+> PHOTO_CONTENT = Обязательно \ 
+> Ссылка на страницу = https://apiok.ru/oauth_callback \
+> Список разрешённых redirect_uri = https://apiok.ru/oauth_callback \
+> сохранить, перезайти \
+> Ищем ID приложения справа от "Основные настройки приложения" - ID 512002358821 \
+> Открываем в браузере https://connect.ok.ru/oauth/authorize?client_id=512002358821&scope=PHOTO_CONTENT;VALUABLE_ACCESS&response_type=token&redirect_uri=https://apiok.ru/oauth_callback \
+> С адресной строки копируем token в access_token ниже \
+> application_key = Публичный ключ справа от "Основные настройки приложения" \
+> Вечный access_token - Получить новый \
+> application_secret_key = Session_secret_key \
+
+run bot with python
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -m requirements.txt 
 python bot.py
-``````
+```
+run bot in docker
+```bash
+docker build -t soaska/sd_bot .
+docker run soaska/sd_bot
+```
 
 use ; in prompt as delimiter to be divided into several separate parts, like ```cat;dog;car```
 
@@ -106,4 +131,3 @@ Donations are **not needed**. Who wants to subscribe to [my generations](https:/
 Lifehack`s:  
 If Lora dont work, see [this](https://github.com/AUTOMATIC1111/stable-diffusion-webui/issues/7984?ref=blog.hinablue.me#issuecomment-1514312942) 
   
-© _Mishgen_

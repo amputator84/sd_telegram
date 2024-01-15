@@ -1,4 +1,5 @@
 # https://docs.aiogram.dev/en/latest/
+from ipaddress import ip_address
 from aiogram import Bot, Dispatcher, types
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
@@ -34,6 +35,10 @@ import logging
 import vk_api
 from vk_api import VkUpload #https://github.com/python273/vk_api
 from ok_api import OkApi, Upload # https://github.com/needkirem/ok_api
+import dotenv
+import os
+
+dotenv.load_dotenv()
 
 # Настройка логгера
 logging.basicConfig(format="[%(asctime)s] %(levelname)s : %(name)s : %(message)s",
@@ -44,34 +49,17 @@ logging.getLogger('aiogram').setLevel(logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 # from https://t.me/BotFather
-API_BOT_TOKEN = "TOKEN_HERE"
-#заходим в https://oauth.vk.com/authorize?client_id=51626357&scope=photos&redirect_uri=http%3A%2F%2Foauth.vk.com%2Fblank.html&display=page&response_type=token
-# где 51626357 - номер вашего включенного приложения, созданного в https://vk.com/apps?act=manage,
-# photos - зона доступа.
-# После перехода и подтверждения выцепляем access_token из адресной строки
-# TODO auto requests
-# OK https://ok.ru/vitrine/myuploaded
-# Добавить приложение - https://ok.ru/app/setup
-# дбавить платформу - OAUTH
-# VALUABLE_ACCESS = Обязательно
-# PHOTO_CONTENT = Обязательно
-# Ссылка на страницу = https://apiok.ru/oauth_callback
-# Список разрешённых redirect_uri = https://apiok.ru/oauth_callback
-# сохранить, перезайти
-# Ищем ID приложения справа от "Основные настройки приложения" - ID 512002358821
-# Открываем в браузере https://connect.ok.ru/oauth/authorize?client_id=512002358821&scope=PHOTO_CONTENT;VALUABLE_ACCESS&response_type=token&redirect_uri=https://apiok.ru/oauth_callback
-# С адресной строки копируем token в access_token ниже
-# application_key = Публичный ключ справа от "Основные настройки приложения"
-# Вечный access_token - Получить новый
-# application_secret_key = Session_secret_key
-VK_TOKEN = 'VK_TOKEN_HERE'
-API_BOT_TOKEN = 'API_BOT_TOKEN_HERE'
-VK_ALBUM_ID = 'VK_ALBUM_ID' # брать с адресной строки, когда открываешь ВК. Пример https://vk.com/album123_789
-OK_ACCESS_TOKEN = 'OK_ACCESS_TOKEN_HERE'
-OK_APPLICATION_KEY = 'OK_APPLICATION_KEY_HERE'
-OK_APPLICATION_SECRET_KEY = 'OK_APPLICATION_SECRET_KEY_HERE'
-OK_GROUP_ID = 'OK_GROUP_ID_HERE'
+
+VK_TOKEN = os.getenv('VK_TOKEN')
+API_BOT_TOKEN = os.getenv('API_BOT_TOKEN')
+VK_ALBUM_ID = os.getenv('VK_ALBUM_ID') # брать с адресной строки, когда открываешь ВК. Пример https://vk.com/album123_789
+OK_ACCESS_TOKEN = os.getenv('OK_ACCESS_TOKEN')
+OK_APPLICATION_KEY = os.getenv('OK_APPLICATION_KEY')
+OK_APPLICATION_SECRET_KEY = os.getenv('OK_APPLICATION_SECRET_KEY')
+OK_GROUP_ID = os.getenv('OK_GROUP_ID')
 ARRAY_INLINE = []
+
+print(API_BOT_TOKEN)
 
 bot = Bot(token=API_BOT_TOKEN)
 storage = MemoryStorage()
@@ -97,10 +85,11 @@ def getAttrtxt2img():
 
 # -------- GLOBAL ----------
 formatted_date = datetime.today().strftime("%Y-%m-%d")
-host = "127.0.0.1"
-port = "7861"
+host = os.getenv('SD_HOST')
+port = os.getenv('SD_PORT')
 # https://github.com/mix1009/sdwebuiapi
 api = webuiapi.WebUIApi(host=host, port=port)
+api.set_auth(os.getenv('SD_USERNAME'), os.getenv('SD_PASSWORD'))
 # TODO --share used shared link. https://123456.gradio.live/docs does not work
 local = "http://" + host + ":" + port
 process = None
@@ -640,7 +629,7 @@ async def inl_sd(message: Union[types.Message, types.CallbackQuery]) -> None:
             await message.message.edit_text(
                 "Запускаем SD\n" + getTxt(), reply_markup=getStart()
             )
-            url = 'http://127.0.0.1:7861/docs'
+            url = f'http://{host}:port/docs/'
             n = 0
             while n != 200:
                 time.sleep(2)

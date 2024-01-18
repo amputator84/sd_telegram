@@ -31,7 +31,6 @@ from translate import Translator
 import base64
 from pathlib import Path
 import logging
-import sys
 import vk_api
 from vk_api import VkUpload #https://github.com/python273/vk_api
 from ok_api import OkApi, Upload # https://github.com/needkirem/ok_api
@@ -176,8 +175,6 @@ def pilToImages(res, typeImages="tg"):
         image_buffer = io.BytesIO()
         image.save(image_buffer, format="PNG")
         image_buffer.seek(0)
-        if image_buffer.getbuffer().nbytes > 999999999 and typeImages == 'tg':
-            typeImages = 'thumbs'
         # картинка в телеге
         if typeImages == "tg":
             media_group.append(types.InputMediaPhoto(media=image_buffer, caption=seed))
@@ -568,15 +565,15 @@ async def rnd_script(message, typeScript):
 
 # show thumb/tg/real
 async def show_thumbs(chat_id, res):
-    if str(data['img_thumb']).lower() == 'true':
+    if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
         await bot.send_media_group(
             chat_id=chat_id, media=pilToImages(res, "thumbs")
         )
-    if str(data['img_tg']).lower() == 'true':
+    if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
         await bot.send_media_group(
             chat_id=chat_id, media=pilToImages(res, "tg")
         )
-    if str(data['img_real']).lower() == 'true':
+    if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
         messages = await bot.send_media_group(
             chat_id=chat_id,
             media=pilToImages(res, "real")
@@ -865,15 +862,13 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "use_prompt": "true",
                       "json_prompt": "false"}
     if m == 'fp_sdxl':
-        data['enable_hr'] = 'True'
-        data['denoising_strength'] = '0.3'
-        data['steps'] = 15
+        data['steps'] = 5
         data['sampler_name'] = 'DPM++ SDE Karras'
+        data['enable_hr'] = 'false'
         data['cfg_scale'] = '4'
         data['width'] = '1024'
         data['height'] = '1024'
         data['restore_faces'] = 'false'
-        data['hr_upscaler'] = '4x_NMKD-Siax_200k'
         data['do_not_save_grid'] = 'true'
         data['negative_prompt'] = 'FastNegativeV2'
         data['save_images'] = 'true'
@@ -932,15 +927,15 @@ async def inl_gen(message: Union[types.Message, types.CallbackQuery]) -> None:
                 # TODO try catch if wrong data
                 res = await api.txt2img(**data)
                 # show_thumbs dont work because use_async
-                if str(data['img_thumb']).lower() == 'true':
+                if dataParams["img_thumb"] == "true" or dataParams["img_thumb"] == "True":
                     await bot.send_media_group(
                         chat_id=chatId, media=pilToImages(res, "thumbs")
                     )
-                if str(data['img_tg']).lower() == 'true':
+                if dataParams["img_tg"] == "true" or dataParams["img_tg"] == "True":
                     await bot.send_media_group(
                         chat_id=chatId, media=pilToImages(res, "tg")
                     )
-                if str(data['img_real']).lower() == 'true':
+                if dataParams["img_real"] == "true" or dataParams["img_real"] == "True":
                     messages = await bot.send_media_group(
                         chat_id=chatId,
                         media=pilToImages(res, "real")
@@ -1368,7 +1363,6 @@ async def handle_channel_post(message: types.Message):
 @dp.message_handler(lambda message: True)
 async def change_json(message: types.Message):
     logging.info("change_json")
-    chatId = message.chat.id
     keyboard = InlineKeyboardMarkup(inline_keyboard=[getSet(0), getOpt(0), getStart(0)])
     text = message.text
     nam = text.split()[0][1:]  # txt из /txt 321
@@ -1415,24 +1409,12 @@ async def change_json(message: types.Message):
                 f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
             )
     else:
-        if str(dataParams['just_gen']).lower() == 'true':
-            if len(message.text) < 500:
-                data["prompt"] = translateRuToEng(message.text)
-            else:
-                data["prompt"] = message.text
-            data["use_async"] = "True"
-            res = await api.txt2img(**data)
-            # TODO img_real and data
-            await bot.send_media_group(
-                chat_id=chatId, media=pilToImages(res, "tg")
-            )
-        else:
-            data["prompt"] = message.text
-            await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
-            await message.answer(
-                f"Записали промпт. JSON параметры:\n{getJson()}\n{getJson(1)}",
-                reply_markup=keyboard,
-            )
+        data["prompt"] = message.text#translateRuToEng(message.text)
+        await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+        await message.answer(
+            f"Записали промпт. JSON параметры:\n{getJson()}\n{getJson(1)}",
+            reply_markup=keyboard,
+        )
 
 # Ввели ответ на change_json
 @dp.message_handler(state=Form)

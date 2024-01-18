@@ -1353,8 +1353,11 @@ async def inl_yes_no(callback: types.CallbackQuery) -> None:
 async def handle_channel_post(message: types.Message):
     logging.info("handle_channel_post")
     chatId = message.chat.id
-    data["prompt"] = message.text
     if str(dataParams['just_gen']).lower() == 'true':
+        if len(message.text) < 500:
+            data["prompt"] = translateRuToEng(message.text)
+        else:
+            data["prompt"] = message.text
         data["use_async"] = "True"
         res = await api.txt2img(**data)
         await bot.send_media_group(
@@ -1412,8 +1415,11 @@ async def change_json(message: types.Message):
                 f"JSON параметры:\n{getJson()}\n{getJson(1)}", reply_markup=keyboard
             )
     else:
-        data["prompt"] = message.text  # translateRuToEng(message.text)
         if str(dataParams['just_gen']).lower() == 'true':
+            if len(message.text) < 500:
+                data["prompt"] = translateRuToEng(message.text)
+            else:
+                data["prompt"] = message.text
             data["use_async"] = "True"
             res = await api.txt2img(**data)
             # TODO img_real and data
@@ -1421,6 +1427,7 @@ async def change_json(message: types.Message):
                 chat_id=chatId, media=pilToImages(res, "tg")
             )
         else:
+            data["prompt"] = message.text
             await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
             await message.answer(
                 f"Записали промпт. JSON параметры:\n{getJson()}\n{getJson(1)}",

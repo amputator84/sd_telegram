@@ -862,13 +862,15 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "use_prompt": "true",
                       "json_prompt": "false"}
     if m == 'fp_sdxl':
-        data['steps'] = 5
+        data['enable_hr'] = 'True'
+        data['denoising_strength'] = '0.3'
+        data['steps'] = 15
         data['sampler_name'] = 'DPM++ SDE Karras'
-        data['enable_hr'] = 'false'
         data['cfg_scale'] = '4'
         data['width'] = '1024'
         data['height'] = '1024'
         data['restore_faces'] = 'false'
+        data['hr_upscaler'] = '4x_NMKD-Siax_200k'
         data['do_not_save_grid'] = 'true'
         data['negative_prompt'] = 'FastNegativeV2'
         data['save_images'] = 'true'

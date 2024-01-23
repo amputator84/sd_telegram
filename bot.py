@@ -767,7 +767,7 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
         data['sampler_name'] = 'Euler a'
         data['enable_hr'] = 'True'
         data['denoising_strength'] = '0.5'
-        data['hr_upscaler'] = '4x_NMKD-Siax_200k' #https://huggingface.co/uwg/upscaler/blob/main/ESRGAN/4x_NMKD-Siax_200k.pth
+        data['hr_upscaler'] = '4x-AnimeSharp' #https://huggingface.co/uwg/upscaler/blob/main/ESRGAN/4x_NMKD-Siax_200k.pth
         data['hr_second_pass_steps'] = '10'
         data['cfg_scale'] = '6'
         data['width'] = '512'
@@ -820,8 +820,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
         data['hr_upscaler'] = '4x_NMKD-Siax_200k'
         data['hr_second_pass_steps'] = '20'
         data['cfg_scale'] = '7'
-        data['width'] = '768'
-        data['height'] = '1024'
+        data['width'] = '512'
+        data['height'] = '768'
         data['restore_faces'] = 'false'
         data['do_not_save_grid'] = 'true'
         data['negative_prompt'] = 'easynegative, bad-hands-5, bad-picture-chill-75v, bad-artist, bad_prompt_version2, rmadanegative4_sd15-neg, bad-image-v2-39000, illustration, painting, cartoons, sketch, (worst quality:2), (low quality:2), (normal quality:2), lowres, bad anatomy, bad hands, ((monochrome)), ((grayscale)), collapsed eyeshadow, multiple eyeblows, vaginas in breasts, (cropped), oversaturated, extra limb, missing limbs, deformed hands, long neck, long body, imperfect, (bad hands), signature, watermark, username, artist name, conjoined fingers, deformed fingers, ugly eyes, imperfect eyes, skewed eyes, unnatural face, unnatural body, error, asian, obese, tatoo, stacked torsos, totem pole, watermark, black and white, close up, cartoon, 3d, denim, (disfigured), (deformed), (poorly drawn), (extra limbs), blurry, boring, sketch, lackluster, signature, letters'

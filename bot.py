@@ -59,8 +59,6 @@ OK_APPLICATION_SECRET_KEY = os.getenv('OK_APPLICATION_SECRET_KEY')
 OK_GROUP_ID = os.getenv('OK_GROUP_ID')
 ARRAY_INLINE = []
 
-print(API_BOT_TOKEN)
-
 bot = Bot(token=API_BOT_TOKEN)
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)

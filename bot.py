@@ -107,6 +107,7 @@ dataParams = {"img_thumb": "true",
               "sd_model_checkpoint": "",
               "use_prompt": "true",
               "json_prompt": "false",
+              "just_gen": "false",
               "send_vk": "false"}
 dataOld = data.copy()
 dataOldParams = dataParams.copy()
@@ -515,7 +516,7 @@ async def rnd_script(message, typeScript):
         text=dataPromptOld
     )
     for i, number in enumerate(numbers):
-        time.sleep(5)
+        time.sleep(1)
         for itemTxt in data['prompt'].split(';'):
             if typeScript == 'models':
                 api.util_wait_for_ready()
@@ -848,13 +849,15 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "use_prompt": "true",
                       "json_prompt": "false"}
     if m == 'fp_sdxl':
-        data['steps'] = 5
+        data['enable_hr'] = 'True'
+        data['denoising_strength'] = '0.3'
+        data['steps'] = 15
         data['sampler_name'] = 'DPM++ SDE Karras'
-        data['enable_hr'] = 'false'
         data['cfg_scale'] = '4'
         data['width'] = '1024'
         data['height'] = '1024'
         data['restore_faces'] = 'false'
+        data['hr_upscaler'] = '4x_NMKD-Siax_200k'
         data['do_not_save_grid'] = 'true'
         data['negative_prompt'] = 'FastNegativeV2'
         data['save_images'] = 'true'
@@ -863,7 +866,8 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
                       "img_real": "true",
                       "stop_sd": "true",
                       "use_prompt": "true",
-                      "json_prompt": "false"}
+                      "json_prompt": "false",
+                      "just_gen": "false"}
     txt = f"JSON отредактирован\n{getJson()}\n{getJson(1)}"
     await getKeyboardUnion(txt, message, keyboard, '')
 
@@ -1327,6 +1331,22 @@ async def inl_yes_no(callback: types.CallbackQuery) -> None:
         text=f"JSON параметры:\n{getJson()}\n{getJson(1)}",
         reply_markup=keyboard,
     )
+
+# отлов поста с канала и мгновенная генерация если включен just_gen
+@dp.channel_post_handler()
+async def handle_channel_post(message: types.Message):
+    logging.info("handle_channel_post")
+    chatId = message.chat.id
+    if str(dataParams['just_gen']).lower() == 'true':
+        if len(message.text) < 500:
+            data["prompt"] = translateRuToEng(message.text)
+        else:
+            data["prompt"] = message.text
+        data["use_async"] = "True"
+        res = await api.txt2img(**data)
+        await bot.send_media_group(
+            chat_id=chatId, media=pilToImages(res, "tg")
+        )
 
 # Ввели любой текст
 @dp.message_handler(lambda message: True)

@@ -44,7 +44,10 @@ dotenv.load_dotenv()
 logging.basicConfig(format="[%(asctime)s] %(levelname)s : %(name)s : %(message)s",
                     level=logging.DEBUG, datefmt="%d-%m-%y %H:%M:%S")
 
-logging.getLogger('aiogram').setLevel(logging.DEBUG)
+if os.getenv('DEBUG') == "yes":
+    logging.getLogger('aiogram').setLevel(logging.DEBUG)
+else:
+    logging.getLogger('aiogram').setLevel(logging.DEBUG)
 
 logger = logging.getLogger(__name__)
 

@@ -113,6 +113,7 @@ data = getAttrtxt2img()
 data['prompt'] = 'cat in space' # Ý
 data['steps'] = 15
 data['sampler_name'] = 'Euler a'
+data['scheduler'] = 'karras'
 dataParams = {"img_thumb": "true",
               "img_tg": "false",
               "img_real": "true",
@@ -267,14 +268,15 @@ def get_prompt_settings(typeCode = 'HTML'):
     steps = data['steps']
     negative_prompt = data['negative_prompt'].replace('<', '&lt;').replace('>', '&gt;')
     sampler_name = data['sampler_name']
+    scheduler = data['scheduler']
     if sd == '❌':
         sd_model_checkpoint = dataParams['sd_model_checkpoint']
     else:
         sd_model_checkpoint = api.get_options()['sd_model_checkpoint']
     if typeCode == 'HTML':
-        txt = f"prompt = <code>{prompt}</code>\nsteps = {steps} \ncfg_scale = {cfg_scale} \nwidth = {width} \nheight = {height} \nsampler_name = {sampler_name} \nsd_model_checkpoint = {sd_model_checkpoint} \nnegative_prompt = <code>{negative_prompt}</code> "
+        txt = f"prompt = <code>{prompt}</code>\nsteps = {steps} \ncfg_scale = {cfg_scale} \nwidth = {width} \nheight = {height} \nsampler_name = {sampler_name} \nscheduler = {scheduler} \nsd_model_checkpoint = {sd_model_checkpoint} \nnegative_prompt = <code>{negative_prompt}</code> "
     else:
-        txt = f"prompt = {prompt}\n\nsteps = {steps} cfg_scale = {cfg_scale} width = {width} height = {height} sampler_name = {sampler_name} sd_model_checkpoint = {sd_model_checkpoint} \n\nnegative_prompt = {negative_prompt} "
+        txt = f"prompt = {prompt}\n\nsteps = {steps} cfg_scale = {cfg_scale} width = {width} height = {height} sampler_name = {sampler_name} scheduler = {scheduler} sd_model_checkpoint = {sd_model_checkpoint} \n\nnegative_prompt = {negative_prompt} "
     return txt
 
 # Translate
@@ -504,6 +506,10 @@ def get_models():
 def get_samplers_list():
     samplers = api.get_samplers()
     return set_array(samplers, 'name', 'samplers')
+
+def get_schedulers_list():
+    schedulers = api.get_schedulers()
+    return set_array(schedulers, 'name', 'schedulers')
 
 # get hr
 def get_hr_list():
@@ -866,6 +872,7 @@ async def inl_fp(message: Union[types.Message, types.CallbackQuery]) -> None:
         data['denoising_strength'] = '0.3'
         data['steps'] = 15
         data['sampler_name'] = 'DPM++ SDE Karras'
+        data['scheduler'] = 'karras'
         data['cfg_scale'] = '4'
         data['width'] = '1024'
         data['height'] = '1024'
@@ -1108,6 +1115,22 @@ async def inl_smplr(message: Union[types.Message, types.CallbackQuery]) -> None:
         keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
         await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
 
+# Вызов get_schedulers
+@dp.message_handler(commands=["sh"])
+@dp.message_handler(commands=["scheduler"])
+@dp.callback_query_handler(text="sh")
+async def inl_sh(message: Union[types.Message, types.CallbackQuery]) -> None:
+    logging.info("inl_sh")
+    global sd
+    if sd == '✅':
+        menu = get_schedulers_list()
+        menu.append(getOpt(0))
+        menu.append(getStart(0))
+        await getKeyboardUnion("schedulers", message, InlineKeyboardMarkup(inline_keyboard=menu))
+    else:
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[getOpt(0), getStart(0)])
+        await getKeyboardUnion("Turn on SD"+sd, message, keyboard)
+
 # Вызов get_hr_list
 @dp.message_handler(commands=["hr"])
 @dp.message_handler(commands=["hr_upscaler"])
@@ -1306,6 +1329,20 @@ async def inl_samplers(callback: types.CallbackQuery) -> None:
     menu.append(getOpt(0))
     menu.append(getStart(0))
     await getKeyboardUnion('Теперь сэмплер = ' + str(smplr), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
+
+# тыкнули на шедулер
+@dp.callback_query_handler(text_startswith="schedulers")
+async def inl_schedulers(callback: types.CallbackQuery) -> None:
+    logging.info('inl_schedulers')
+    sh = callback.data.split("|")[1]
+    options = {}
+    options['scheduler'] = sh
+    api.set_options(options)
+    data['scheduler'] = sh # Ý
+    menu = get_schedulers_list()
+    menu.append(getOpt(0))
+    menu.append(getStart(0))
+    await getKeyboardUnion('Теперь scheduler = ' + str(sh), callback, InlineKeyboardMarkup(inline_keyboard=menu), '')
 
 # тыкнули на hr_upscaler
 @dp.callback_query_handler(text_startswith="hrs")
